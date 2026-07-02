@@ -36,6 +36,32 @@ and fill in every `CHANGE_ME_*` value. **Never commit `.env`.**
 - Branch from `supracloud_ira`, keep PRs small and reviewable, merge back with a normal
   merge commit. **Never force-push shared branches.**
 
+## Commit identity guard
+
+Commits must be authored by a person's git identity, with no tool attribution in the
+message (no `Co-Authored-By`, no "generated with" lines — see `CLAUDE.md`). A tracked
+`commit-msg` hook enforces this; enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Claude Code sessions can run this automatically: `.claude/hooks/session-start.sh` sets
+`core.hooksPath` (and, in remote web containers, resets the git author from the tool
+default to the canonical identity in `.mailmap`). To activate it, register the hook in
+`.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command",
+                     "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" } ] }
+    ]
+  }
+}
+```
+
 ## Code style
 
 - Python: match the existing style — type hints on public functions, docstrings that
