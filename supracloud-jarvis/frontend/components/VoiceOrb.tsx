@@ -100,16 +100,16 @@ export default function VoiceOrb({ livekitUrl, livekitToken, autoConnect = false
 
   const orbColor: Record<VoiceState, string> = {
     idle:       "bg-neutral-800 border-neutral-700 text-neutral-400",
-    connecting: "bg-neutral-800 border-saffron-500/40 text-saffron-400",
-    listening:  "bg-saffron-500/20 border-saffron-500 text-saffron-400",
+    connecting: "bg-neutral-800 border-cyan-500/40 text-cyan-400",
+    listening:  "bg-cyan-500/20 border-cyan-500 text-cyan-400",
     thinking:   "bg-indigo-500/20 border-indigo-500 text-indigo-400",
     speaking:   "bg-green-500/20 border-green-500 text-green-400",
   };
 
   const ringColor: Record<VoiceState, string> = {
     idle:       "",
-    connecting: "bg-saffron-500/30",
-    listening:  "bg-saffron-500/40",
+    connecting: "bg-cyan-500/30",
+    listening:  "bg-cyan-500/40",
     thinking:   "bg-indigo-500/40",
     speaking:   "bg-green-500/40",
   };

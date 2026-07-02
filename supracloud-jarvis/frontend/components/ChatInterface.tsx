@@ -8,6 +8,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import type { AppMode } from "./Sidebar";
+import {
+  nexusBeginRun,
+  nexusAnalysisStarted,
+  nexusRunCompleted,
+  nexusRunFailed,
+  requestPermission,
+} from "@/lib/nexus";
 
 interface AgentBubble {
   name: string;
@@ -661,6 +668,9 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
       const userMsgId = Date.now().toString();
       const assistantMsgId = (Date.now() + 1).toString();
 
+      // Nexus: open a run on the execution timeline / agent boards.
+      nexusBeginRun(content, { origin: "typed", attachedFile: attachedFile?.name });
+
       setMessages((prev) => [
         ...prev,
         { id: userMsgId, role: "user", content },
@@ -711,6 +721,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
         });
 
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+        nexusAnalysisStarted();
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -800,6 +811,13 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                   rafId = requestAnimationFrame(flushTokens);
                 }
               } else if (data.done) {
+                nexusRunCompleted({
+                  backendAgent: data.agent,
+                  latencyMs: data.latency_ms,
+                  pendingApply: data.pending_apply === true,
+                  deepSearchRounds: data.deep_search_rounds ?? 0,
+                  usedLiveSearch: data.used_live_x === true,
+                });
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMsgId
@@ -819,6 +837,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                   )
                 );
               } else if (data.error) {
+                nexusRunFailed(String(data.error));
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMsgId
@@ -834,6 +853,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
+          nexusRunFailed("connection error");
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgId
@@ -874,11 +894,11 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
 
   const accentSend = isTutor
     ? "bg-indigo-500 hover:bg-indigo-600 text-white"
-    : "bg-saffron-500 hover:bg-saffron-600 text-white";
+    : "bg-cyan-500 hover:bg-cyan-600 text-white";
 
   const accentBorder = isTutor
     ? "focus-within:border-indigo-500/50"
-    : "focus-within:border-saffron-500/40";
+    : "focus-within:border-cyan-500/40";
 
   const suggestions = SUGGESTIONS[mode] ?? SUGGESTIONS.assistant;
 
@@ -930,7 +950,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                 "w-20 h-20 rounded-full flex items-center justify-center mb-5 border animate-float-soft",
                 isTutor
                   ? "bg-indigo-500/10 border-indigo-500/20"
-                  : "bg-saffron-500/10 border-saffron-500/20 ira-orb-glow"
+                  : "bg-cyan-500/10 border-cyan-500/20 ira-orb-glow"
               )}
             >
               <span className="text-4xl" aria-hidden="true">
@@ -961,7 +981,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                     "px-3 py-1.5 rounded-full text-xs border transition-all duration-150",
                     isTutor
                       ? "border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
-                      : "border-saffron-500/30 text-saffron-400 hover:bg-saffron-500/10"
+                      : "border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
                   )}
                 >
                   {s}
@@ -980,7 +1000,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                 )}
               >
                 {msg.role === "assistant" && (
-                  <div className="w-6 h-6 rounded-full bg-saffron-500/20 border border-saffron-500/30 flex items-center justify-center flex-shrink-0 mt-1 mr-2 select-none">
+                  <div className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center flex-shrink-0 mt-1 mr-2 select-none">
                     <span className="text-xs">✦</span>
                   </div>
                 )}
@@ -989,12 +1009,12 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                     className={clsx(
                       "rounded-2xl px-4 py-3 text-sm leading-relaxed break-words",
                       msg.role === "user"
-                        ? "bg-gradient-to-br from-saffron-500 to-saffron-600 text-white rounded-br-sm shadow-glow-saffron"
+                        ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-br-sm shadow-glow-cyan"
                         : "ira-glass text-neutral-100 rounded-bl-sm"
                     )}
                   >
                     {msg.role === "assistant" ? (
-                      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:text-white prose-headings:font-semibold prose-code:text-saffron-300 prose-code:bg-neutral-900 prose-code:px-1 prose-code:rounded prose-pre:bg-neutral-900 prose-pre:border prose-pre:border-neutral-700">
+                      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:text-white prose-headings:font-semibold prose-code:text-cyan-300 prose-code:bg-neutral-900 prose-code:px-1 prose-code:rounded prose-pre:bg-neutral-900 prose-pre:border prose-pre:border-neutral-700">
                         {/* Think Mode reasoning panel */}
                         {msg.thinkingContent !== undefined && (
                           <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/5 overflow-hidden">
@@ -1067,7 +1087,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                         {/* Feature #4: Document download */}
                         {msg.documentUrl && (
                           <div className="mb-3 flex items-center gap-2 p-2 rounded-lg bg-neutral-900 border border-neutral-700">
-                            <FileText className="w-5 h-5 text-saffron-400 flex-shrink-0" />
+                            <FileText className="w-5 h-5 text-cyan-400 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-white truncate">{msg.documentFilename}</p>
                               <p className="text-[10px] text-neutral-500">{(msg.documentFormat ?? "").toUpperCase()} document</p>
@@ -1075,7 +1095,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                             <a
                               href={msg.documentUrl}
                               download={msg.documentFilename}
-                              className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-saffron-500/20 border border-saffron-500/40 text-saffron-400 text-[11px] hover:bg-saffron-500/30 no-underline transition-colors"
+                              className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 text-[11px] hover:bg-cyan-500/30 no-underline transition-colors"
                             >
                               ⬇️ Download
                             </a>
@@ -1116,7 +1136,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                         )}
                         {msg.content && <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>}
                         {msg.isStreaming && (
-                          <span className="inline-block w-1.5 h-4 bg-saffron-400 ml-0.5 align-middle animate-cursor-blink" />
+                          <span className="inline-block w-1.5 h-4 bg-cyan-400 ml-0.5 align-middle animate-cursor-blink" />
                         )}
                       </div>
                     ) : (
@@ -1217,9 +1237,25 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                     )}
                     {msg.pendingApply && !msg.isStreaming && (
                       <button
-                        onClick={() => sendMessage("Architect apply")}
+                        onClick={async () => {
+                          // Side-effecting: writes generated code into the IRA
+                          // workspace — must pass the permission console first.
+                          const decision = await requestPermission({
+                            title: "Apply Architect implementation",
+                            description:
+                              "The Architect team proposed code changes. Applying executes the implementation against the IRA workspace.",
+                            access: [
+                              "Write generated code into the IRA workspace",
+                              "Run the Architect apply pipeline on the core",
+                            ],
+                            risk: "high",
+                            scope: "architect-apply",
+                            scopeLabel: "Architect applies",
+                          });
+                          if (decision !== "deny") sendMessage("Architect apply");
+                        }}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/20 border border-green-500/40 text-green-400 hover:bg-green-500/30 transition-colors"
-                        title="Apply the generated implementation"
+                        title="Apply the generated implementation — requires your approval"
                       >
                         ⚡ Apply Implementation
                       </button>
@@ -1326,7 +1362,7 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                 className={clsx(
                   "flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all mb-0.5",
                   input.trim()
-                    ? `${accentSend} shadow-glow-saffron`
+                    ? `${accentSend} shadow-glow-cyan`
                     : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
                 )}
               >

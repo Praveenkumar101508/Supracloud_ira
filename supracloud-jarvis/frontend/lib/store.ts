@@ -80,6 +80,14 @@ export const useAuthStore = create<AuthState>()(
       name: "ira:auth:v1",
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({ token: state.token }),
+      // Only the token is persisted, so isAuthenticated must be re-derived on
+      // rehydrate — otherwise a reload drops back to the gate despite a live
+      // session token.
+      merge: (persisted, current) => {
+        const p = persisted as { token?: string } | undefined;
+        const token = p?.token ?? "";
+        return { ...current, token, isAuthenticated: !!token };
+      },
     }
   )
 );
