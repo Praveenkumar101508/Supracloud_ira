@@ -6,10 +6,12 @@
    Dark-first premium surface system. Three depth levels:
    canvas (page) → panel (sidebar/header) → card (bubbles, inputs, modals).   */
 :root {
-  --ira-canvas: #060608;
-  --ira-accent: #f97316; /* saffron-500 */
-  --ira-accent-soft: rgba(249, 115, 22, 0.14);
-  --ira-indigo-soft: rgba(99, 102, 241, 0.1);
+  --ira-canvas: #0a0a0c; /* nexus base — graphite with a hint of navy */
+  --ira-accent: #22d3ee; /* electric cyan — primary accent */
+  --ira-accent-soft: rgba(34, 211, 238, 0.08);
+  --ira-indigo-soft: rgba(139, 122, 235, 0.07);
+  --ira-consent: #fbbf24; /* amber — reserved for consent/warning */
+  --ira-memory: #a78bfa; /* soft violet — memory/intelligence */
 }
 
 * {
@@ -44,9 +46,9 @@ body {
   -webkit-backdrop-filter: blur(14px);
 }
 
-/* Brand gradient text (login heading, empty state). */
+/* Brand gradient text (gate heading, empty state). */
 .ira-gradient-text {
-  background: linear-gradient(92deg, #fdba74 0%, #f97316 45%, #a5b4fc 110%);
+  background: linear-gradient(92deg, #a5f3fc 0%, #22d3ee 45%, #a78bfa 110%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -55,8 +57,29 @@ body {
 /* Soft outer glow for the brand orb. */
 .ira-orb-glow {
   box-shadow:
-    0 0 32px rgba(249, 115, 22, 0.28),
-    0 0 90px rgba(249, 115, 22, 0.12);
+    0 0 32px rgba(34, 211, 238, 0.25),
+    0 0 90px rgba(34, 211, 238, 0.1);
+}
+
+/* Nexus card — soft glass, thin border, generous radius. */
+.nx-card {
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Monospace readouts (gate diagnostics, timeline timestamps). */
+.nx-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+/* Display face for the gate welcome line — light weight, wide tracking. */
+.nx-display {
+  font-weight: 250;
+  letter-spacing: 0.015em;
 }
 
 /* Thin, tasteful scrollbar */
@@ -78,13 +101,13 @@ body {
 /* Keyboard-visible focus ring everywhere — a11y for buttons, inputs, links.
    Mouse clicks don't trigger it (that's what :focus-visible is for). */
 :focus-visible {
-  outline: 2px solid rgba(249, 115, 22, 0.65);
+  outline: 2px solid rgba(34, 211, 238, 0.6);
   outline-offset: 2px;
   border-radius: 6px;
 }
 
 ::selection {
-  background: rgba(249, 115, 22, 0.35);
+  background: rgba(34, 211, 238, 0.3);
 }
 
 /* Blinking cursor for streaming messages */
