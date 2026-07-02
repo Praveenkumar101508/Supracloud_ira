@@ -1,0 +1,50 @@
+#!/bin/sh
+# commit-msg guard — enforces the repo's commit-identity rules (see CLAUDE.md R2).
+#
+# Rejects a commit when:
+#   1. the message references an AI tool or carries attribution trailers, or
+#   2. the effective author identity is a tool identity rather than a person.
+#
+# Enable with: git config core.hooksPath .githooks
+# (Claude Code sessions do this automatically via .claude/hooks/session-start.sh)
+
+set -eu
+
+msg_file="$1"
+
+# Strip comment lines and everything below a scissors line before scanning,
+# so template comments can't cause false rejections.
+msg=$(sed -e '/^# ------------------------ >8 ------------------------$/,$d' \
+          -e '/^#/d' "$msg_file")
+
+fail() {
+    echo "commit-msg: REJECTED — $1" >&2
+    echo "commit-msg: rule R2: commits are authored by the configured git user only," >&2
+    echo "commit-msg: with no tool attribution in the message. Edit and retry." >&2
+    exit 1
+}
+
+if printf '%s' "$msg" | grep -qiE 'co-authored-by'; then
+    fail "message contains a Co-Authored-By trailer"
+fi
+
+if printf '%s' "$msg" | grep -qiE 'generated (with|by)'; then
+    fail "message contains a generated-with attribution line"
+fi
+
+if printf '%s' "$msg" | grep -qiE 'anthropic|\bclaude\b'; then
+    fail "message references an AI tool name"
+fi
+
+# Author identity check: block known tool identities and empty identities.
+author_ident=$(git var GIT_AUTHOR_IDENT 2>/dev/null || true)
+case "$author_ident" in
+    ''|*noreply@anthropic.com*)
+        fail "author identity is unset or a tool identity ($author_ident)"
+        ;;
+esac
+if printf '%s' "$author_ident" | grep -qiE '^(claude|anthropic|.*\[bot\])\b'; then
+    fail "author name is a tool identity ($author_ident)"
+fi
+
+exit 0
