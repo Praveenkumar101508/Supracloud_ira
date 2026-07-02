@@ -29,7 +29,7 @@ const MODES: { id: AppMode; label: string; icon: React.ReactNode; accent: string
     id: "assistant",
     label: "Assistant",
     icon: <Bot className="w-4 h-4" />,
-    accent: "text-saffron-400 border-saffron-500/60 bg-saffron-500/10",
+    accent: "text-cyan-400 border-cyan-500/60 bg-cyan-500/10",
     description: "General AI assistant",
   },
   {

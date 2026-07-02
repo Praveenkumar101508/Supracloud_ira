@@ -23,8 +23,25 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Mic, Volume2, Loader2 } from "lucide-react";
 import clsx from "clsx";
+import {
+  usePulseStore,
+  useVoicePanelStore,
+  useAgentStore,
+  nexusBeginRun,
+  nexusRunCompleted,
+  nexusRunFailed,
+  type PulseState,
+} from "@/lib/nexus";
 
 type VoiceState = "idle" | "listening" | "thinking" | "speaking";
+
+// The voice loop drives the Pulse glyph directly — same vocabulary.
+const PULSE_MAP: Record<VoiceState, PulseState> = {
+  idle: "idle",
+  listening: "listening",
+  thinking: "thinking",
+  speaking: "speaking",
+};
 
 interface Props {
   token: string;
@@ -139,6 +156,10 @@ export default function VoiceConsole({ token, sessionId }: Props) {
   const setState = useCallback((s: VoiceState) => {
     stateRef.current = s;
     setVoiceState(s);
+    // Mirror onto the Pulse unless a permission prompt owns it.
+    const pulse = usePulseStore.getState();
+    if (pulse.state !== "permission") pulse.setState(PULSE_MAP[s]);
+    useAgentStore.getState().setAgent("voice", s === "idle" ? "ready" : "running", s === "idle" ? undefined : s);
   }, []);
 
   // ── Audio setup ───────────────────────────────────────────────────────────
@@ -157,6 +178,8 @@ export default function VoiceConsole({ token, sessionId }: Props) {
       acRef.current = ac;
       analyserRef.current = analyser;
       tdRef.current = new Uint8Array(analyser.fftSize);
+      // Share the mic analyser so the Pulse glyph reacts to real audio.
+      usePulseStore.getState().setAnalyser(analyser);
     }
     if (acRef.current.state === "suspended") await acRef.current.resume();
   }, []);
@@ -431,12 +454,16 @@ export default function VoiceConsole({ token, sessionId }: Props) {
 
   const converse = useCallback(
     async (userText: string, isOwner: boolean) => {
+      // Nexus telemetry: transcript, intent readout and a timeline run.
+      useVoicePanelStore.getState().setCommand(userText, "voice");
+      nexusBeginRun(userText, { origin: "voice" });
       setState("thinking");
       streamDoneRef.current = false;
       const ctrl = new AbortController();
       chatAbortRef.current = ctrl;
       startBargeMonitor();
       let pending = "";
+      let failed = false;
       try {
         const res = await fetch("/api/v1/chat/stream", {
           method: "POST",
@@ -483,9 +510,14 @@ export default function VoiceConsole({ token, sessionId }: Props) {
           }
         }
       } catch (e: any) {
-        if (e?.name !== "AbortError") enqueueTTS("Sorry, I hit a problem. Please try again.");
+        if (e?.name !== "AbortError") {
+          failed = true;
+          nexusRunFailed("voice stream error");
+          enqueueTTS("Sorry, I hit a problem. Please try again.");
+        }
       } finally {
         streamDoneRef.current = true;
+        if (!failed) nexusRunCompleted({ backendAgent: "voice" });
         if (pending.trim()) enqueueTTS(pending);
         // If the reply produced no audio at all, drop back to listening.
         if (!ttsBusyRef.current && ttsQueueRef.current.length === 0 && sourcesRef.current.size === 0) {
@@ -650,6 +682,7 @@ export default function VoiceConsole({ token, sessionId }: Props) {
       if (bargeRafRef.current !== null) cancelAnimationFrame(bargeRafRef.current);
       if (micRef.current) micRef.current.getTracks().forEach((t) => t.stop());
       if (acRef.current) void acRef.current.close();
+      usePulseStore.getState().setAnalyser(null);
     };
   }, [stopWatch, stopPlayback]);
 
@@ -663,13 +696,13 @@ export default function VoiceConsole({ token, sessionId }: Props) {
   };
   const orbColor: Record<VoiceState, string> = {
     idle: "bg-neutral-800 border-neutral-700 text-neutral-400",
-    listening: "bg-saffron-500/20 border-saffron-500 text-saffron-400",
+    listening: "bg-cyan-500/20 border-cyan-500 text-cyan-400",
     thinking: "bg-indigo-500/20 border-indigo-500 text-indigo-400",
     speaking: "bg-green-500/20 border-green-500 text-green-400",
   };
   const ringColor: Record<VoiceState, string> = {
     idle: "",
-    listening: "bg-saffron-500/40",
+    listening: "bg-cyan-500/40",
     thinking: "bg-indigo-500/40",
     speaking: "bg-green-500/40",
   };
