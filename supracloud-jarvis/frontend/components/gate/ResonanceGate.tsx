@@ -1,12 +1,18 @@
 "use client";
 
 /**
- * Awakening Gate — replaces the login page.
+ * Resonance Gate — the cinematic entry to IRA, built around the LivingOrb.
  *
- * Sequence: black void → breathing dot → typed diagnostic readouts (driven by
+ * Sequence: black void → the orb wakes → typed diagnostic readouts (driven by
  * real subsystem probes, never hardcoded positives) → welcome line → unlock.
  *
- * Credential model:
+ * The orb is the interface: it listens when you speak your phrase (reacting
+ * to your live voice through the Web Audio analyser), turns contemplative
+ * while a credential verifies, flashes emerald on success and amber on a
+ * failed attempt. A successful unlock plays a full-screen resonance bloom
+ * before the workspace fades in.
+ *
+ * Credential model (unchanged from the original gate):
  *   - Passkey (WebAuthn, platform user verification) and local PIN (salted
  *     PBKDF2 hash) are the real credentials.
  *   - The voice phrase is a convenience layer: a match only routes to the
@@ -16,12 +22,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { Fingerprint, KeyRound, Mic, ShieldCheck, RotateCcw, Loader2 } from "lucide-react";
 import { probeSystems, READOUT_TEXT, type Readout } from "@/lib/systemStatus";
 import {
   getEnrollment,
-  isEnrolled,
   enrollPin,
   verifyPin,
   savePasskey,
@@ -40,6 +46,11 @@ import {
   assertPasskey,
 } from "@/lib/gate/webauthn";
 import { useAuthStore } from "@/lib/store";
+import { useAudioReactivity } from "@/hooks/useAudioReactivity";
+import type { OrbState } from "@/components/orb/LivingOrb";
+
+// The Three.js scene must never render on the server.
+const LivingOrb = dynamic(() => import("@/components/orb/LivingOrb"), { ssr: false });
 
 type Phase = "void" | "boot" | "welcome" | "auth";
 
@@ -117,7 +128,7 @@ function TypedLine({
 
 // ── Gate ─────────────────────────────────────────────────────────────────────
 
-export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: string) => void }) {
+export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: string) => void }) {
   const { token, setToken } = useAuthStore();
   const unlockGate = useGateStore((s) => s.unlock);
 
@@ -139,6 +150,7 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
   const [notice, setNotice] = useState("");
   const [voiceOk, setVoiceOk] = useState(false); // phrase matched → real credential step
   const [needsRelink, setNeedsRelink] = useState(false);
+  const [unlocking, setUnlocking] = useState(false); // cinematic exit in progress
 
   // Setup state (first run)
   const [setupStep, setSetupStep] = useState<"core" | "credentials">("core");
@@ -150,6 +162,33 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
   const [stayLinked, setStayLinked] = useState(true);
   const [passkeyDone, setPasskeyDone] = useState(false);
 
+  // ── Orb choreography ────────────────────────────────────────────────────────
+  // The orb mirrors the gate: listening while it hears you, thinking while a
+  // credential verifies, a transient success/warning flash on outcomes, and a
+  // sustained success bloom while the unlock transition plays.
+  const [orbFx, setOrbFx] = useState<OrbState | null>(null);
+  const orbFxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashOrb = useCallback((s: OrbState, ms = 1700) => {
+    if (orbFxTimer.current) clearTimeout(orbFxTimer.current);
+    setOrbFx(s);
+    orbFxTimer.current = setTimeout(() => setOrbFx(null), ms);
+  }, []);
+  useEffect(() => () => {
+    if (orbFxTimer.current) clearTimeout(orbFxTimer.current);
+  }, []);
+
+  // Live mic analysis while the gate listens for the unlock phrase — the orb
+  // rides the user's actual voice, not a canned animation.
+  const gateAudio = useAudioReactivity({ updateHz: 24 });
+
+  const orbState: OrbState = unlocking
+    ? "success"
+    : busy === "voice"
+      ? "listening"
+      : busy !== ""
+        ? "thinking"
+        : orbFx ?? "idle";
+
   // Subtle parallax — layers drift a few px against the pointer.
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
@@ -157,6 +196,8 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
   const sy = useSpring(my, { stiffness: 50, damping: 20 });
   const glowX = useTransform(sx, (v) => v * 14);
   const glowY = useTransform(sy, (v) => v * 14);
+  const orbX = useTransform(sx, (v) => v * 8);
+  const orbY = useTransform(sy, (v) => v * 8);
   const cardX = useTransform(sx, (v) => v * -6);
   const cardY = useTransform(sy, (v) => v * -6);
 
@@ -173,7 +214,7 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
   useEffect(() => {
     setEnrollment(getEnrollment());
     void platformAuthenticatorAvailable().then(setPlatformAuth);
-    const t = setTimeout(() => setPhase("boot"), reducedMotion ? 100 : 700);
+    const t = setTimeout(() => setPhase("boot"), reducedMotion ? 100 : 900);
     void probeSystems().then(setReadouts);
     return () => clearTimeout(t);
   }, [reducedMotion]);
@@ -214,13 +255,25 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
     []
   );
 
+  // Cinematic unlock: the orb blooms and the gate dissolves before the
+  // workspace mounts. State is committed *after* the transition so the page
+  // swap happens behind the bloom, not mid-animation.
+  const finishedRef = useRef(false);
   const finish = useCallback(
     (authToken: string) => {
-      setToken(authToken);
-      unlockGate();
-      onUnlocked?.(authToken);
+      if (finishedRef.current) return;
+      finishedRef.current = true;
+      gateAudio.stop();
+      setUnlocking(true);
+      setNotice("");
+      const commit = () => {
+        setToken(authToken);
+        unlockGate();
+        onUnlocked?.(authToken);
+      };
+      setTimeout(commit, reducedMotion ? 150 : 1600);
     },
-    [setToken, unlockGate, onUnlocked]
+    [gateAudio, reducedMotion, setToken, unlockGate, onUnlocked]
   );
 
   // ── Unlock paths ───────────────────────────────────────────────────────────
@@ -231,6 +284,7 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
     const ok = await assertPasskey(enrollment.passkey);
     setBusy("");
     if (!ok) {
+      flashOrb("warning");
       setNotice("Passkey verification failed.");
       return;
     }
@@ -240,7 +294,7 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
       return;
     }
     setNeedsRelink(true);
-  }, [enrollment, token, finish]);
+  }, [enrollment, token, finish, flashOrb]);
 
   const unlockWithPin = useCallback(async () => {
     if (pin.length < 4) return;
@@ -249,6 +303,7 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
     const ok = await verifyPin(pin);
     if (!ok) {
       setBusy("");
+      flashOrb("warning");
       setNotice("Incorrect PIN.");
       return;
     }
@@ -260,13 +315,14 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
       const core = await unwrapCore(pin);
       setBusy("");
       if (core) return finish(core);
+      flashOrb("warning");
       setNotice("Stored session could not be decrypted — relink the core.");
       setNeedsRelink(true);
       return;
     }
     setBusy("");
     setNeedsRelink(true);
-  }, [pin, token, enrollment, finish]);
+  }, [pin, token, enrollment, finish, flashOrb]);
 
   const listenForPhrase = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -276,6 +332,8 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
     }
     setBusy("voice");
     setNotice("");
+    // Open the analyser first so the orb reacts the instant the user speaks.
+    void gateAudio.start();
     const r = new SR();
     r.continuous = false;
     r.interimResults = false;
@@ -283,49 +341,65 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
     r.onresult = async (e: any) => {
       const said = e.results[0][0].transcript as string;
       const match = await verifyVoicePhrase(said);
+      gateAudio.stop();
       setBusy("");
       if (match) {
         setVoiceOk(true);
+        flashOrb("success");
         setNotice("Phrase recognized — confirm with passkey or PIN to unlock.");
         if (enrollment?.passkey) void unlockWithPasskey();
       } else {
+        flashOrb("warning");
         setNotice("Phrase not recognized.");
       }
     };
     r.onerror = () => {
+      gateAudio.stop();
       setBusy("");
+      flashOrb("warning");
       setNotice("Didn't catch that — try again.");
     };
-    r.onend = () => setBusy((b) => (b === "voice" ? "" : b));
+    r.onend = () => {
+      gateAudio.stop();
+      setBusy((b) => (b === "voice" ? "" : b));
+    };
     try {
       r.start();
     } catch {
+      gateAudio.stop();
       setBusy("");
     }
-  }, [enrollment, unlockWithPasskey]);
+  }, [enrollment, unlockWithPasskey, gateAudio, flashOrb]);
 
   const relink = useCallback(async () => {
     setBusy("core");
     const t = await linkCore(username, coreKey);
     setBusy("");
-    if (!t) return;
+    if (!t) {
+      flashOrb("warning");
+      return;
+    }
     // Re-seal under the PIN when the user just proved it and opted in before.
     if (enrollment?.pin && pin && (await verifyPin(pin))) {
       await storeWrappedCore(pin, t);
     }
     finish(t);
-  }, [linkCore, username, coreKey, enrollment, pin, finish]);
+  }, [linkCore, username, coreKey, enrollment, pin, finish, flashOrb]);
 
   // ── First-run setup ────────────────────────────────────────────────────────
   const setupLinkCore = useCallback(async () => {
     setBusy("core");
     const t = await linkCore(username, coreKey);
     setBusy("");
-    if (!t) return;
+    if (!t) {
+      flashOrb("warning");
+      return;
+    }
     setToken(t);
     setNotice("");
+    flashOrb("success");
     setSetupStep("credentials");
-  }, [linkCore, username, coreKey, setToken]);
+  }, [linkCore, username, coreKey, setToken, flashOrb]);
 
   const setupEnrollPasskey = useCallback(async () => {
     setBusy("passkey");
@@ -335,10 +409,12 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
       savePasskey(rec);
       setPasskeyDone(true);
       setNotice("");
+      flashOrb("success");
     } else {
+      flashOrb("warning");
       setNotice("Passkey registration was cancelled or failed.");
     }
-  }, [enrollment]);
+  }, [enrollment, flashOrb]);
 
   const completeSetup = useCallback(async () => {
     const wantsPin = setupPin.length > 0;
@@ -380,15 +456,20 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
   }, []);
 
   const enrolled = enrollment ? isEnrolledFrom(enrollment) : false;
-  const showSetup = phase === "auth" && !enrolled;
-  const showUnlock = phase === "auth" && enrolled;
+  const showSetup = phase === "auth" && !enrolled && !unlocking;
+  const showUnlock = phase === "auth" && enrolled && !unlocking;
+
+  // Hero orb: the canvas keeps one fixed buffer size (resizing WebGL mid-
+  // animation glitches); the settle into the auth phase is a pure transform.
+  const orbSize = 300;
+  const settledScale = phase === "auth" ? 0.8 : 1;
 
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black text-white"
       onPointerMove={onPointerMove}
     >
-      {/* Depth layer 1 — faint drifting glow, parallax-linked */}
+      {/* Depth layer — faint drifting glow, parallax-linked */}
       <motion.div
         aria-hidden
         className="pointer-events-none fixed inset-0"
@@ -400,20 +481,47 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
         />
       </motion.div>
 
-      <div className="min-h-full flex flex-col items-center justify-center px-6 py-12">
-        {/* The dot */}
+      <div className="min-h-full flex flex-col items-center justify-center px-6 py-10">
+        {/* The LivingOrb — hero of the gate. It waits, listens, verifies. */}
+        <motion.div
+          style={{ x: orbX, y: orbY }}
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={
+            unlocking
+              ? { opacity: 0, scale: reducedMotion ? 1 : 2.4 }
+              : { opacity: 1, scale: settledScale }
+          }
+          transition={
+            unlocking
+              ? { duration: reducedMotion ? 0.15 : 1.5, ease: [0.7, 0, 0.3, 1] }
+              : { duration: reducedMotion ? 0.2 : 1.6, ease: "easeOut" }
+          }
+          className={phase === "auth" ? "-mb-6 -mt-10" : "mb-2"}
+        >
+          <LivingOrb
+            state={orbState}
+            analyser={gateAudio.analyser}
+            audioLevel={gateAudio.level}
+            size={orbSize}
+            ariaLabel={`IRA gate — ${orbState}`}
+          />
+        </motion.div>
+
+        {/* Full-screen resonance bloom while the unlock transition plays */}
         <AnimatePresence>
-          {phase !== "auth" && (
+          {unlocking && (
             <motion.div
-              key="dot"
-              exit={{ opacity: 0, scale: 0.6 }}
-              transition={{ duration: 0.6 }}
-              className="mb-10"
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-cyan-300 animate-gate-dot">
-                <div className="w-full h-full rounded-full bg-cyan-300 animate-breathe shadow-glow-cyan" />
-              </div>
-            </motion.div>
+              key="bloom"
+              aria-hidden
+              className="pointer-events-none fixed inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: reducedMotion ? 0.1 : 1.2, ease: "easeIn" }}
+              style={{
+                background:
+                  "radial-gradient(circle at 50% 42%, rgba(52,211,153,0.22) 0%, rgba(34,211,238,0.10) 35%, #000 78%)",
+              }}
+            />
           )}
         </AnimatePresence>
 
@@ -433,11 +541,12 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
 
         {/* Welcome */}
         <AnimatePresence>
-          {(phase === "welcome" || phase === "auth") && (
+          {(phase === "welcome" || phase === "auth") && !unlocking && (
             <motion.h1
               key="welcome"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 1.1, ease: "easeOut" }}
               className="nx-display text-2xl sm:text-3xl text-neutral-100 text-center mt-4 mb-2"
             >
@@ -464,9 +573,10 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
               key="unlock"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.7, ease: "easeOut", delay: 0.15 }}
               style={{ x: cardX, y: cardY }}
-              className="w-full max-w-sm mt-8"
+              className="w-full max-w-sm mt-6"
             >
               <div className="nx-card p-6 space-y-4">
                 {notice && (
@@ -475,18 +585,33 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
 
                 {!needsRelink ? (
                   <>
+                    {enrollment?.voice && (
+                      <button
+                        onClick={listenForPhrase}
+                        disabled={busy !== ""}
+                        className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-cyan-400/30 bg-cyan-400/10 hover:bg-cyan-400/15 text-cyan-100 py-3 text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {busy === "voice" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                        {busy === "voice" ? "Listening…" : "Speak to IRA"}
+                      </button>
+                    )}
+
                     {enrollment?.passkey && webAuthnAvailable() && (
                       <button
                         onClick={unlockWithPasskey}
                         disabled={busy !== ""}
-                        className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-cyan-400/30 bg-cyan-400/10 hover:bg-cyan-400/15 text-cyan-100 py-3 text-sm font-medium transition-colors disabled:opacity-50"
+                        className={`w-full flex items-center justify-center gap-2.5 rounded-xl border py-3 text-sm font-medium transition-colors disabled:opacity-50 ${
+                          voiceOk
+                            ? "border-cyan-400/40 bg-cyan-400/15 hover:bg-cyan-400/20 text-cyan-100"
+                            : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-neutral-200"
+                        }`}
                       >
                         {busy === "passkey" ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <Fingerprint className="w-4 h-4" />
                         )}
-                        Unlock with passkey · device authentication
+                        Unlock with passkey
                       </button>
                     )}
 
@@ -512,17 +637,6 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
                           {busy === "pin" ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
                         </button>
                       </div>
-                    )}
-
-                    {enrollment?.voice && (
-                      <button
-                        onClick={listenForPhrase}
-                        disabled={busy !== ""}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-neutral-300 py-2.5 text-[13px] transition-colors disabled:opacity-50"
-                      >
-                        {busy === "voice" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-                        {busy === "voice" ? "Listening…" : "Speak your unlock phrase"}
-                      </button>
                     )}
 
                     <p className="text-[10.5px] leading-relaxed text-neutral-600">
@@ -580,9 +694,10 @@ export default function AwakeningGate({ onUnlocked }: { onUnlocked?: (token: str
               key="setup"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.7, ease: "easeOut", delay: 0.15 }}
               style={{ x: cardX, y: cardY }}
-              className="w-full max-w-sm mt-8"
+              className="w-full max-w-sm mt-6"
             >
               <div className="nx-card p-6 space-y-4">
                 {notice && <p role="status" className="text-[12px] text-amber-300/90">{notice}</p>}

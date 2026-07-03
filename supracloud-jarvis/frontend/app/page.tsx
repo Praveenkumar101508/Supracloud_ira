@@ -5,7 +5,8 @@ import ChatInterface from "@/components/ChatInterface";
 import VoiceOrb from "@/components/VoiceOrb";
 import VoiceConsole from "@/components/VoiceConsole";
 import Sidebar from "@/components/Sidebar";
-import AwakeningGate from "@/components/gate/AwakeningGate";
+import ResonanceGate from "@/components/gate/ResonanceGate";
+import OrbDock from "@/components/orb/OrbDock";
 import SystemBar from "@/components/nexus/SystemBar";
 import VoiceCommandPanel from "@/components/nexus/VoiceCommandPanel";
 import ExecutionTimeline from "@/components/nexus/ExecutionTimeline";
@@ -85,7 +86,7 @@ export default function Home() {
   // The gate blocks everything until a real credential succeeds AND a core
   // session exists. No email/password login page — the gate owns entry.
   if (!gateUnlocked || !isAuthenticated) {
-    return <AwakeningGate onUnlocked={(t) => void fetchLivekitToken(t)} />;
+    return <ResonanceGate onUnlocked={(t) => void fetchLivekitToken(t)} />;
   }
 
   const voiceTransport = (process.env.NEXT_PUBLIC_VOICE_TRANSPORT || "browser") === "livekit";
@@ -125,8 +126,12 @@ export default function Home() {
 
         <div className="flex-1 flex min-h-0">
           {/* Results workspace — the conversation and structured outputs */}
-          <main className="flex-1 overflow-hidden min-w-0">
+          <main className="relative flex-1 overflow-hidden min-w-0">
             <ChatInterface key={chatKey} sessionId={sessionId} token={token} mode={mode} />
+            {/* The LivingOrb keeps its presence after the gate — floating over
+                the workspace, still riding the live mic through the shared
+                Pulse analyser. Decorative: pointer events pass through. */}
+            <OrbDock size={116} />
           </main>
 
           {/* Activity rail: voice command, execution timeline, agents, memory */}

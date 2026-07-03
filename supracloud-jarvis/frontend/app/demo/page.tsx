@@ -9,9 +9,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
-import Pulse from "@/components/pulse/Pulse";
 import { usePulseStore, type PulseState } from "@/lib/nexus";
+import { orbStateFromPulse } from "@/components/orb/orbState";
+
+const LivingOrb = dynamic(() => import("@/components/orb/LivingOrb"), { ssr: false });
 
 const SCRIPT: Array<{ state: PulseState; label: string; hold: number }> = [
   { state: "idle", label: "Idle — breathing", hold: 3000 },
@@ -95,7 +98,7 @@ export default function DemoPage() {
           </div>
         ) : (
           <>
-            <Pulse size={180} />
+            <LivingOrb state={orbStateFromPulse(current?.state ?? "idle")} size={320} />
             <AnimatePresence mode="wait">
               <motion.p
                 key={current?.label}
