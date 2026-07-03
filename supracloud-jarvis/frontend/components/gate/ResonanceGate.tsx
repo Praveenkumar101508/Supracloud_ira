@@ -7,10 +7,13 @@
  * real subsystem probes, never hardcoded positives) → welcome line → unlock.
  *
  * The orb is the interface: it listens when you speak your phrase (reacting
- * to your live voice through the Web Audio analyser), turns contemplative
- * while a credential verifies, flashes emerald on success and amber on a
- * failed attempt. A successful unlock plays a full-screen resonance bloom
- * before the workspace fades in.
+ * to your live voice through the Web Audio analyser), turns visibly
+ * contemplative while a credential or spoken phrase verifies, flashes emerald
+ * on success and amber on a failed attempt. A successful unlock plays a
+ * two-act exit: the orb blooms with an outward energy burst, then — once the
+ * workspace has mounted beneath the gate — the black shell dissolves and the
+ * orb flies home to the OrbDock in the top-right corner (`onHandoff` /
+ * `onExited` let the page keep the gate mounted for the flight).
  *
  * Credential model (unchanged from the original gate):
  *   - Passkey (WebAuthn, platform user verification) and local PIN (salted
@@ -53,6 +56,9 @@ import type { OrbState } from "@/components/orb/LivingOrb";
 const LivingOrb = dynamic(() => import("@/components/orb/LivingOrb"), { ssr: false });
 
 type Phase = "void" | "boot" | "welcome" | "auth";
+
+/** Fixed canvas size of the hero orb (px) — resizing WebGL mid-flight glitches. */
+const ORB_SIZE = 300;
 
 const STATE_COLOR: Record<Readout["state"], string> = {
   online: "text-cyan-300",
@@ -128,7 +134,17 @@ function TypedLine({
 
 // ── Gate ─────────────────────────────────────────────────────────────────────
 
-export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: string) => void }) {
+export default function ResonanceGate({
+  onUnlocked,
+  onHandoff,
+  onExited,
+}: {
+  onUnlocked?: (token: string) => void;
+  /** Fired when the workspace should mount beneath the gate (exit flight starts). */
+  onHandoff?: () => void;
+  /** Fired when the exit flight is over and the gate can unmount. */
+  onExited?: () => void;
+}) {
   const { token, setToken } = useAuthStore();
   const unlockGate = useGateStore((s) => s.unlock);
 
@@ -146,11 +162,17 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
 
   // Unlock state
   const [pin, setPin] = useState("");
-  const [busy, setBusy] = useState<"" | "passkey" | "pin" | "voice" | "core">("");
+  // "voice" = mic open, "verify" = spoken phrase being analyzed (orb thinks).
+  const [busy, setBusy] = useState<"" | "passkey" | "pin" | "voice" | "verify" | "core">("");
   const [notice, setNotice] = useState("");
   const [voiceOk, setVoiceOk] = useState(false); // phrase matched → real credential step
   const [needsRelink, setNeedsRelink] = useState(false);
-  const [unlocking, setUnlocking] = useState(false); // cinematic exit in progress
+  const [unlocking, setUnlocking] = useState(false); // act 1: success bloom on the orb
+  const [exiting, setExiting] = useState(false); // act 2: shell dissolves, orb flies to dock
+  // Flight vector from the orb's centre to the live OrbDock, measured after
+  // the workspace mounts; null = dock unavailable (small screen) → fade out.
+  const [exitDelta, setExitDelta] = useState<{ x: number; y: number; scale: number } | null>(null);
+  const orbWrapRef = useRef<HTMLDivElement | null>(null);
 
   // Setup state (first run)
   const [setupStep, setSetupStep] = useState<"core" | "credentials">("core");
@@ -185,7 +207,7 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
     ? "success"
     : busy === "voice"
       ? "listening"
-      : busy !== ""
+      : busy !== "" // "verify" and credential checks read as analysis
         ? "thinking"
         : orbFx ?? "idle";
 
@@ -255,9 +277,13 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
     []
   );
 
-  // Cinematic unlock: the orb blooms and the gate dissolves before the
-  // workspace mounts. State is committed *after* the transition so the page
-  // swap happens behind the bloom, not mid-animation.
+  // Cinematic unlock in two acts.
+  //   Act 1 — the orb blooms emerald with an outward energy burst while the
+  //           resonance wash rises (~1s).
+  //   Act 2 — auth state commits, the workspace mounts *beneath* the gate
+  //           (the page keeps the gate alive via onHandoff), the black shell
+  //           dissolves and the orb flies home to the measured OrbDock
+  //           position, cross-fading into the dock's own orb.
   const finishedRef = useRef(false);
   const finish = useCallback(
     (authToken: string) => {
@@ -271,9 +297,42 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
         unlockGate();
         onUnlocked?.(authToken);
       };
-      setTimeout(commit, reducedMotion ? 150 : 1600);
+      if (reducedMotion) {
+        setTimeout(() => {
+          onHandoff?.();
+          commit();
+          setExiting(true);
+          setTimeout(() => onExited?.(), 250);
+        }, 150);
+        return;
+      }
+      window.setTimeout(() => {
+        onHandoff?.();
+        commit();
+        // Two frames so the workspace (and the dock's layout box) exists,
+        // then aim the flight at the dock's real centre.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            const dock = document.querySelector("[data-orb-dock]");
+            const orbEl = orbWrapRef.current;
+            if (dock && orbEl) {
+              const d = dock.getBoundingClientRect();
+              const o = orbEl.getBoundingClientRect();
+              if (d.width > 0 && o.width > 0) {
+                setExitDelta({
+                  x: d.left + d.width / 2 - (o.left + o.width / 2),
+                  y: d.top + d.height / 2 - (o.top + o.height / 2),
+                  scale: d.width / ORB_SIZE,
+                });
+              }
+            }
+            setExiting(true);
+            window.setTimeout(() => onExited?.(), 1300);
+          })
+        );
+      }, 1050);
     },
-    [gateAudio, reducedMotion, setToken, unlockGate, onUnlocked]
+    [gateAudio, reducedMotion, setToken, unlockGate, onUnlocked, onHandoff, onExited]
   );
 
   // ── Unlock paths ───────────────────────────────────────────────────────────
@@ -340,8 +399,15 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
     r.lang = "en-US";
     r.onresult = async (e: any) => {
       const said = e.results[0][0].transcript as string;
-      const match = await verifyVoicePhrase(said);
       gateAudio.stop();
+      // Analysis beat: the orb turns visibly contemplative while the phrase
+      // is checked. Verification and the hold run concurrently, so the beat
+      // never costs more than the hold itself.
+      setBusy("verify");
+      const [match] = await Promise.all([
+        verifyVoicePhrase(said),
+        new Promise((res) => setTimeout(res, reducedMotion ? 0 : 700)),
+      ]);
       setBusy("");
       if (match) {
         setVoiceOk(true);
@@ -369,7 +435,7 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
       gateAudio.stop();
       setBusy("");
     }
-  }, [enrollment, unlockWithPasskey, gateAudio, flashOrb]);
+  }, [enrollment, unlockWithPasskey, gateAudio, flashOrb, reducedMotion]);
 
   const relink = useCallback(async () => {
     setBusy("core");
@@ -461,19 +527,32 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
 
   // Hero orb: the canvas keeps one fixed buffer size (resizing WebGL mid-
   // animation glitches); the settle into the auth phase is a pure transform.
-  const orbSize = 300;
   const settledScale = phase === "auth" ? 0.8 : 1;
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black text-white"
+      className={`fixed inset-0 z-50 overflow-y-auto text-white ${
+        exiting ? "pointer-events-none" : ""
+      }`}
       onPointerMove={onPointerMove}
     >
+      {/* Black shell — dissolves during the handoff, revealing the workspace
+          the page has already mounted beneath the gate. */}
+      <motion.div
+        aria-hidden
+        className="fixed inset-0 bg-black"
+        initial={false}
+        animate={{ opacity: exiting ? 0 : 1 }}
+        transition={{ duration: reducedMotion ? 0.1 : 0.9, ease: "easeInOut" }}
+      />
+
       {/* Depth layer — faint drifting glow, parallax-linked */}
       <motion.div
         aria-hidden
         className="pointer-events-none fixed inset-0"
         style={{ x: glowX, y: glowY }}
+        animate={{ opacity: exiting ? 0 : 1 }}
+        transition={{ duration: reducedMotion ? 0.1 : 0.7, ease: "easeOut" }}
       >
         <div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vmax] h-[60vmax] rounded-full opacity-[0.06]"
@@ -481,20 +560,41 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
         />
       </motion.div>
 
-      <div className="min-h-full flex flex-col items-center justify-center px-6 py-10">
-        {/* The LivingOrb — hero of the gate. It waits, listens, verifies. */}
+      <div className="relative min-h-full flex flex-col items-center justify-center px-6 py-10">
+        {/* The LivingOrb — hero of the gate. It waits, listens, verifies; on
+            unlock it pops with a success burst, then flies home to the dock. */}
         <motion.div
-          style={{ x: orbX, y: orbY }}
+          ref={orbWrapRef}
+          style={exiting ? undefined : { x: orbX, y: orbY }}
           initial={{ opacity: 0, scale: 0.6 }}
           animate={
-            unlocking
-              ? { opacity: 0, scale: reducedMotion ? 1 : 2.4 }
-              : { opacity: 1, scale: settledScale }
+            exiting
+              ? exitDelta
+                ? {
+                    x: exitDelta.x,
+                    y: exitDelta.y,
+                    scale: exitDelta.scale,
+                    opacity: [1, 1, 0],
+                  }
+                : { opacity: 0, scale: reducedMotion ? 1 : 1.15 }
+              : unlocking
+                ? { scale: [settledScale, settledScale * 1.14, settledScale], opacity: 1 }
+                : { opacity: 1, scale: settledScale }
           }
           transition={
-            unlocking
-              ? { duration: reducedMotion ? 0.15 : 1.5, ease: [0.7, 0, 0.3, 1] }
-              : { duration: reducedMotion ? 0.2 : 1.6, ease: "easeOut" }
+            exiting
+              ? {
+                  duration: reducedMotion ? 0.2 : 1.15,
+                  ease: [0.32, 0.72, 0.24, 1],
+                  opacity: {
+                    duration: reducedMotion ? 0.2 : 1.15,
+                    times: [0, 0.72, 1],
+                    ease: "easeIn",
+                  },
+                }
+              : unlocking
+                ? { duration: 1.0, ease: "easeInOut", times: [0, 0.45, 1] }
+                : { duration: reducedMotion ? 0.2 : 1.6, ease: "easeOut" }
           }
           className={phase === "auth" ? "-mb-6 -mt-10" : "mb-2"}
         >
@@ -502,12 +602,13 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
             state={orbState}
             analyser={gateAudio.analyser}
             audioLevel={gateAudio.level}
-            size={orbSize}
+            size={ORB_SIZE}
             ariaLabel={`IRA gate — ${orbState}`}
           />
         </motion.div>
 
-        {/* Full-screen resonance bloom while the unlock transition plays */}
+        {/* Full-screen resonance bloom while the unlock transition plays;
+            it washes out again as the orb departs for the dock. */}
         <AnimatePresence>
           {unlocking && (
             <motion.div
@@ -515,8 +616,11 @@ export default function ResonanceGate({ onUnlocked }: { onUnlocked?: (token: str
               aria-hidden
               className="pointer-events-none fixed inset-0"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: reducedMotion ? 0.1 : 1.2, ease: "easeIn" }}
+              animate={{ opacity: exiting ? 0 : 1 }}
+              transition={{
+                duration: reducedMotion ? 0.1 : exiting ? 0.8 : 1.0,
+                ease: exiting ? "easeOut" : "easeIn",
+              }}
               style={{
                 background:
                   "radial-gradient(circle at 50% 42%, rgba(52,211,153,0.22) 0%, rgba(34,211,238,0.10) 35%, #000 78%)",
