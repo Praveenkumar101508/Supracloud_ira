@@ -217,6 +217,13 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
   }, [input]);
 
+  // The OrbDock asks the workspace to focus the command input on click.
+  useEffect(() => {
+    const focus = () => textareaRef.current?.focus();
+    window.addEventListener("ira:focus-input", focus);
+    return () => window.removeEventListener("ira:focus-input", focus);
+  }, []);
+
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
