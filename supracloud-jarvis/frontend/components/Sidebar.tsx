@@ -2,8 +2,24 @@
 
 import { useState, useRef, useEffect } from "react";
 // Fix #95: Shield import removed along with bodyguard mode
-import { GraduationCap, Bot, ChevronLeft, ChevronRight, Clock, Download, HardDrive, Upload, RefreshCw } from "lucide-react";
+import {
+  GraduationCap,
+  Bot,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  HardDrive,
+  Upload,
+  RefreshCw,
+  LayoutDashboard,
+  MessageSquare,
+  Brain,
+  ShieldCheck,
+  Mic,
+} from "lucide-react";
 import clsx from "clsx";
+import { useUIStore, type WorkspaceView } from "@/lib/store";
 
 // Fix #95: bodyguard mode removed — it duplicated security features already
 // available in assistant mode and caused confusion about IRA's role.
@@ -23,6 +39,15 @@ interface Props {
   recentChats?: ConversationItem[];
   token?: string;
 }
+
+// Personal v1 workspace views — each maps to a real panel backed by a real API.
+const VIEWS: { id: WorkspaceView; label: string; icon: React.ReactNode }[] = [
+  { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
+  { id: "chat", label: "Chat", icon: <MessageSquare className="w-4 h-4" /> },
+  { id: "memory", label: "Memory Vault", icon: <Brain className="w-4 h-4" /> },
+  { id: "trust", label: "Trust Console", icon: <ShieldCheck className="w-4 h-4" /> },
+  { id: "voice", label: "Voice Setup", icon: <Mic className="w-4 h-4" /> },
+];
 
 const MODES: { id: AppMode; label: string; icon: React.ReactNode; accent: string; description: string }[] = [
   {
@@ -53,6 +78,7 @@ function formatRelative(date: Date): string {
 }
 
 export default function Sidebar({ mode, onModeChange, onNewChat, recentChats = [], token = "" }: Props) {
+  const { view, setView } = useUIStore();
   const [collapsed, setCollapsed] = useState(false);
   // Auto-collapse on small screens after mount (post-hydration, so SSR markup
   // matches the initial client render and no hydration warning fires).
@@ -159,10 +185,42 @@ export default function Sidebar({ mode, onModeChange, onNewChat, recentChats = [
         </button>
       </div>
 
+      {/* Workspace views */}
+      <div className="px-2 pt-3 pb-2 space-y-0.5 border-b border-neutral-800/50">
+        {!collapsed && (
+          <p className="px-1 pb-1 text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">
+            Workspace
+          </p>
+        )}
+        {VIEWS.map((v) => {
+          const isActive = view === v.id;
+          return (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              title={v.label}
+              className={clsx(
+                "w-full flex items-center gap-2.5 rounded-xl border transition-all duration-200",
+                collapsed ? "justify-center p-2.5" : "px-3 py-2",
+                isActive
+                  ? "text-cyan-300 border-cyan-500/40 bg-cyan-500/[0.08] font-medium"
+                  : "border-transparent text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50"
+              )}
+            >
+              {v.icon}
+              {!collapsed && <span className="text-sm">{v.label}</span>}
+            </button>
+          );
+        })}
+      </div>
+
       {/* New Chat button */}
       <div className="px-2 pt-3 pb-2">
         <button
-          onClick={onNewChat}
+          onClick={() => {
+            setView("chat");
+            onNewChat();
+          }}
           className={clsx(
             "w-full flex items-center gap-2 rounded-xl border transition-all duration-200 text-sm font-medium",
             collapsed ? "justify-center p-2" : "px-3 py-2",
