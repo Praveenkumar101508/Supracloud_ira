@@ -4,6 +4,9 @@
 .env.*.local
 !.env.example
 
+# start-ira.sh runtime state (PID files + service logs)
+.ira-run/
+
 # Encrypted secrets — safe to commit (.env.enc should NOT appear here)
 
 # TLS / credentials

@@ -64,7 +64,16 @@ env_or() {  # VAR default
 echo -e "${CYAN}Starting IRA native stack...${NC}"
 
 if [[ -f "$ROOT/.env" ]]; then
-    set -a; source "$ROOT/.env"; set +a
+    # Parse KEY=VALUE lines instead of sourcing: values with spaces or shell
+    # metacharacters (e.g. OWNER_NAME=Praveen Kumar) must not be executed.
+    # Mirrors the .env loader in start-ira.ps1.
+    while IFS= read -r _line; do
+        if [[ "$_line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            _val="${BASH_REMATCH[2]}"
+            _val="${_val%\"}"; _val="${_val#\"}"   # strip surrounding double quotes
+            export "${BASH_REMATCH[1]}=${_val}"
+        fi
+    done < "$ROOT/.env"
     ok ".env" "loaded"
 else
     fail ".env" "missing — copy .env.example to .env and fill in the secrets:"
