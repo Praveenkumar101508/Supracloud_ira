@@ -433,7 +433,10 @@ cp .env.example .env
 # 3a. native (recommended on your own box) — Windows
 ./start-ira.ps1
 
-# 3b. or containerised, for a scale-out box
+# 3b. native — Linux / macOS / WSL2
+./start-ira.sh          # and ./stop-ira.sh to shut down
+
+# 3c. or containerised, for a scale-out box
 docker compose -f docker-compose.cloud.yml up -d
 ```
 
@@ -511,6 +514,55 @@ The `tests/reasoning` suite (routing, consent, answer-quality, memory-context �
 only on the standard library + PyYAML and runs standalone. The other suites and the full
 `pytest tests/ -q` run need the project's `requirements-test.txt` (FastAPI, pydantic, langgraph,
 etc.) — see [`ira/requirements-test.txt`](supracloud-jarvis/ira/requirements-test.txt).
+
+---
+
+## Daily use (Personal v1)
+
+The current milestone is **IRA Personal v1** — IRA fully usable by the owner every day, before
+any public release. Feature-by-feature honesty lives in [`STATUS.md`](STATUS.md).
+
+**Start IRA**
+
+```bash
+cd supracloud-jarvis
+./start-ira.sh            # Linux/macOS/WSL — checks Python/Node/Ollama/Postgres/Redis/.env,
+                          # then starts the API and UI and prints ALL UP
+./start-ira.ps1           # Windows native (same checks, same order)
+```
+
+**Chat** — open `http://localhost:3000`, log in with your admin username + password
+(+ TOTP if enrolled), and talk in the main chat. Each reply shows which agent and model
+handled it.
+
+**Voice** — the browser voice loop is on by default (`NEXT_PUBLIC_VOICE_TRANSPORT=browser`).
+Speak after the wake word (`hey ira`) or use push-to-talk; replies are spoken via the local
+Supertonic engine. To enrol your voiceprint for owner verification:
+`GET /api/v1/voice/challenge` then `POST /api/v1/voice/enroll` with 3–10 short WAV clips —
+only the embedding is stored, raw audio is never kept. Voice is optional: password login
+always works, so you cannot lock yourself out.
+
+**Memory** — the Memory Vault at `/api/v1/memory` saves, lists, edits, pins and forgets
+your curated memories (categories are free slugs: `profile`, `projects`, `job_search`,
+`goals`, ...). Forgetting a memory always asks for confirmation first. Memories are
+reference-only data for IRA — never instructions.
+
+**Trust Console** — `GET /api/v1/trust/status` answers "is everything actually local?":
+privacy mode, external-API switch, model/DB locality, voice enrollment, pending approvals
+and live security warnings.
+
+**Shut down**
+
+```bash
+./stop-ira.sh             # stops the API + UI (+ Ollama only if the script started it)
+```
+
+**Troubleshooting**
+
+- `start-ira.sh` prints a `[FAIL]` line per missing dependency with the fix inline.
+- Backend logs: `.ira-run/ira-api.log`; frontend logs: `.ira-run/frontend.log`.
+- API self-diagnosis: `GET /health` (liveness) and `GET /health/detail` (per-pillar).
+- If voice replies 503, Supertonic isn't installed — chat keeps working (`pip install supertonic`).
 
 ---
 
