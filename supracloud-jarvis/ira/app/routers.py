@@ -90,3 +90,6 @@ def register_routers(app: FastAPI) -> None:
 
     from api.routes.trust import router as trust_router
     app.include_router(trust_router, prefix="/api/v1")           # Personal v1: /trust/status (privacy/locality console)
+
+    from api.routes.memory import router as memory_router
+    app.include_router(memory_router, prefix="/api/v1")          # Personal v1: /memory vault (owner CRUD, forget gated)
