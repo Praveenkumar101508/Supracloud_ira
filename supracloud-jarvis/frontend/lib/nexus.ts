@@ -276,6 +276,39 @@ export const useMemoryContextStore = create<MemoryContextStore>()((set) => ({
   clear: () => set({ items: [] }),
 }));
 
+// ── Last run (Agent Activity readout) ──────────────────────────────────────
+// Populated ONLY from the backend's stream done-frame — fields the backend did
+// not report stay undefined and the panel renders "Not reported yet".
+
+export interface LastRun {
+  command: string;
+  origin: "voice" | "typed";
+  routedIntent: string; // client-side heuristic, labelled as such in the UI
+  backendAgent?: string;
+  model?: string;
+  memoryCount?: number;
+  latencyMs?: number;
+  pendingApproval?: boolean;
+  deepSearchRounds?: number;
+  at: number;
+}
+
+interface LastRunStore {
+  run: LastRun | null;
+  begin: (command: string, origin: "voice" | "typed", routedIntent: string) => void;
+  complete: (info: Partial<LastRun>) => void;
+  clear: () => void;
+}
+
+export const useLastRunStore = create<LastRunStore>()((set) => ({
+  run: null,
+  begin: (command, origin, routedIntent) =>
+    set({ run: { command, origin, routedIntent, at: Date.now() } }),
+  complete: (info) =>
+    set((s) => (s.run ? { run: { ...s.run, ...info, at: Date.now() } } : s)),
+  clear: () => set({ run: null }),
+}));
+
 // ── Run orchestration helpers (called from ChatInterface / VoiceConsole) ────
 
 /** Start a run: timeline, intent readout, router card, pulse. */
@@ -293,6 +326,7 @@ export function nexusBeginRun(command: string, opts: { origin: "voice" | "typed"
   const intent = classifyIntent(command);
   exec.setStage("intent", "done", `${intent.label} · ${(intent.confidence * 100) | 0}% (heuristic)`);
   agents.setAgent("router", "active", intent.label);
+  useLastRunStore.getState().begin(command, opts.origin, intent.label);
 
   if (opts.attachedFile) {
     exec.setStage("files", "active", opts.attachedFile);
@@ -320,7 +354,17 @@ export function nexusRunCompleted(info: {
   pendingApply?: boolean;
   deepSearchRounds?: number;
   usedLiveSearch?: boolean;
+  model?: string;
+  memoryCount?: number;
 }) {
+  useLastRunStore.getState().complete({
+    backendAgent: info.backendAgent,
+    model: info.model,
+    memoryCount: info.memoryCount,
+    latencyMs: info.latencyMs,
+    pendingApproval: info.pendingApply,
+    deepSearchRounds: info.deepSearchRounds,
+  });
   const exec = useExecStore.getState();
   const agents = useAgentStore.getState();
   const memory = useMemoryContextStore.getState();
