@@ -19,16 +19,17 @@ Statuses below reflect what the code and test suite actually cover today — not
 | ------- | ------ | ----- |
 | Local chat (Ollama backend) | Stable | `LLM_BACKEND=ollama`, qwen3:8b fast / qwen3:14b deep tiers |
 | Local model routing | Stable | model profiles + availability fallback (`ira/reasoning`), `IRA_USE_MODEL_ROUTER=true` |
-| Memory save and recall | Stable | pgvector embeddings + reranker; RAG retrieve in chat; owner Memory Vault API (`/api/v1/memory`) |
-| Voice input (STT) | Stable | faster-whisper local transcription (`POST /api/v1/voice/transcribe`) |
-| Voice output (TTS) | Stable | Supertonic on-device engine, fails soft to 503 when not installed (`POST /api/v1/voice/say`) |
+| Memory save and recall (RAG) | Stable | pgvector embeddings + reranker; retrieve wired into chat |
+| Memory Vault API (`/api/v1/memory`) | Beta | owner CRUD; forget is confirmation-gated. UI: Planned |
+| Voice input (STT) | Beta | faster-whisper local transcription (`POST /api/v1/voice/transcribe`) |
+| Voice output (TTS) | Beta | Supertonic on-device engine, fails soft to 503 when not installed (`POST /api/v1/voice/say`) |
 | Owner login | Stable | JWT + refresh tokens, account lockout, optional TOTP, canary tripwires |
 | Owner voice enrollment / verification | Beta | `/api/v1/voice/enroll` + challenge phrases; optional, never blocks password login |
 | Basic UI (chat + orb) | Stable | Next.js app, browser voice loop, resonance gate |
 | Agent activity display | Beta | agents list/detail API + routing decision returned per chat turn |
 | Safe action approval | Stable | every destructive/outbound action (email send, calendar create/delete, note delete) is approval-gated |
 | One-command startup | Stable | `start-ira.ps1` (Windows native), `start-ira.sh` / `stop-ira.sh` (Linux/macOS/WSL) |
-| Trust Console status API | Beta | `/api/v1/trust/status` — privacy mode, model/DB locality, voice enrollment, pending approvals |
+| Trust Console API (`/api/v1/trust/status`) | Beta | privacy mode, model/DB locality, voice enrollment, pending approvals. UI: Planned |
 
 ## Beta
 
@@ -48,6 +49,14 @@ Statuses below reflect what the code and test suite actually cover today — not
 - Coding agent (Aider, owner-gated, branch-only)
 - Wake-word always-on listener
 - Computer use / architect self-modification (owner-gated, protected paths)
+
+## Planned (next PR — Personal v1 UI panels)
+
+- Trust Console UI panel
+- Memory Vault UI (Use / Edit / Forget / Pin buttons)
+- Agent Activity view
+- Voice Setup screen
+- Daily-use dashboard
 
 ## Later (deliberately NOT in Personal v1)
 
