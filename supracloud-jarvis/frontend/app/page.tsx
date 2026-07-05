@@ -14,6 +14,10 @@ import ExecutionTimeline from "@/components/nexus/ExecutionTimeline";
 import AgentActivityPanel from "@/components/nexus/AgentActivityPanel";
 import MemoryContextPanel from "@/components/nexus/MemoryContextPanel";
 import PermissionConsole from "@/components/nexus/PermissionConsole";
+import Dashboard from "@/components/panels/Dashboard";
+import MemoryVault from "@/components/panels/MemoryVault";
+import TrustConsole from "@/components/panels/TrustConsole";
+import VoiceSetup from "@/components/panels/VoiceSetup";
 import { useAuthStore, useUIStore, useChatStore } from "@/lib/store";
 import { useGateStore } from "@/lib/gate/gateAuth";
 import { useExecStore, useMemoryContextStore, useVoicePanelStore } from "@/lib/nexus";
@@ -21,7 +25,7 @@ import { useExecStore, useMemoryContextStore, useVoicePanelStore } from "@/lib/n
 export default function Home() {
   const { token, isAuthenticated, livekitToken, livekitUrl, setLivekitToken, logout } =
     useAuthStore();
-  const { mode, setMode } = useUIStore();
+  const { mode, setMode, view } = useUIStore();
   const { newSession, sessionId } = useChatStore();
   const gateUnlocked = useGateStore((s) => s.unlocked);
   const lockGate = useGateStore((s) => s.lock);
@@ -137,14 +141,23 @@ export default function Home() {
           />
 
           <div className="flex-1 flex min-h-0">
-            {/* Results workspace — the conversation and structured outputs */}
+            {/* Results workspace — the conversation and structured outputs.
+                Chat stays mounted while other panels overlay it, so switching
+                views never loses the conversation (chat messages are
+                component-local state). */}
             <main className="relative flex-1 overflow-hidden min-w-0">
-              <ChatInterface key={chatKey} sessionId={sessionId} token={token} mode={mode} />
+              <div className={view === "chat" ? "h-full" : "hidden"}>
+                <ChatInterface key={chatKey} sessionId={sessionId} token={token} mode={mode} />
+              </div>
+              {view === "dashboard" && <Dashboard token={token} />}
+              {view === "memory" && <MemoryVault token={token} />}
+              {view === "trust" && <TrustConsole token={token} />}
+              {view === "voice" && <VoiceSetup token={token} />}
               {/* The LivingOrb keeps its presence after the gate — floating
                   over the workspace, still riding the live mic through the
                   shared Pulse analyser. Clicking it focuses the command
                   input; everything around it stays click-through. */}
-              <OrbDock size={116} />
+              {view === "chat" && <OrbDock size={116} />}
             </main>
 
             {/* Activity rail: voice command, execution timeline, agents, memory */}

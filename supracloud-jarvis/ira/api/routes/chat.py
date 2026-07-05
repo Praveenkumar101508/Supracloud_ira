@@ -731,6 +731,9 @@ async def chat_stream(
                     "is_engineer": req.engineer_mode,
                     "is_think": req.think_mode,
                     "deep_search_rounds": deep_search_rounds,
+                    # Agent Activity view: real routing metadata, not inferred client-side.
+                    "model": "qwen3-reasoning" if use_reasoning else ("qwen3-deep" if use_deep else "qwen3-fast"),
+                    "memory_count": len(memories_raw or []),
                 })
             }
 

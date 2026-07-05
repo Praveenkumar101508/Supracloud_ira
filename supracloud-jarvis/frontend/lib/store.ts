@@ -156,8 +156,14 @@ export const useChatStore = create<ChatState>()((set) => ({
 // Fix #95: bodyguard mode removed — keep this in sync with components/Sidebar AppMode.
 type AppMode = "assistant" | "tutor";
 
+// Personal v1 workspace views. Chat stays mounted underneath (its messages are
+// component-local state); the other panels overlay it so switching views never
+// loses the conversation.
+export type WorkspaceView = "chat" | "dashboard" | "memory" | "trust" | "voice";
+
 interface UIState {
   mode: AppMode;
+  view: WorkspaceView;
   sidebarOpen: boolean;
   expertMode: boolean;
   engineerMode: boolean;
@@ -165,6 +171,7 @@ interface UIState {
   deepSearch: boolean;
   grokMode: boolean;
   setMode: (mode: AppMode) => void;
+  setView: (view: WorkspaceView) => void;
   setSidebarOpen: (open: boolean) => void;
   toggleExpertMode: () => void;
   toggleEngineerMode: () => void;
@@ -175,6 +182,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>()((set) => ({
   mode: "assistant",
+  view: "chat",
   sidebarOpen: false,
   expertMode: false,
   engineerMode: false,
@@ -182,6 +190,7 @@ export const useUIStore = create<UIState>()((set) => ({
   deepSearch: false,
   grokMode: false,
   setMode: (mode) => set({ mode }),
+  setView: (view) => set({ view }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   toggleExpertMode: () => set((s) => ({ expertMode: !s.expertMode })),
   toggleEngineerMode: () => set((s) => ({ engineerMode: !s.engineerMode })),

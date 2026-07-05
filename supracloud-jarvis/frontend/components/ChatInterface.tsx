@@ -824,6 +824,8 @@ export default function ChatInterface({ sessionId, token, mode = "assistant" }: 
                   pendingApply: data.pending_apply === true,
                   deepSearchRounds: data.deep_search_rounds ?? 0,
                   usedLiveSearch: data.used_live_x === true,
+                  model: data.model,
+                  memoryCount: typeof data.memory_count === "number" ? data.memory_count : undefined,
                 });
                 setMessages((prev) =>
                   prev.map((m) =>

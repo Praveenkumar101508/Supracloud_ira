@@ -20,16 +20,20 @@ Statuses below reflect what the code and test suite actually cover today — not
 | Local chat (Ollama backend) | Stable | `LLM_BACKEND=ollama`, qwen3:8b fast / qwen3:14b deep tiers |
 | Local model routing | Stable | model profiles + availability fallback (`ira/reasoning`), `IRA_USE_MODEL_ROUTER=true` |
 | Memory save and recall (RAG) | Stable | pgvector embeddings + reranker; retrieve wired into chat |
-| Memory Vault API (`/api/v1/memory`) | Beta | owner CRUD; forget is confirmation-gated. UI: Planned |
+| Memory Vault API (`/api/v1/memory`) | Beta | owner CRUD; forget is confirmation-gated |
+| Memory Vault UI | Beta | list/save/edit/pin; forget goes through the backend confirmation-token flow |
 | Voice input (STT) | Beta | faster-whisper local transcription (`POST /api/v1/voice/transcribe`) |
 | Voice output (TTS) | Beta | Supertonic on-device engine, fails soft to 503 when not installed (`POST /api/v1/voice/say`) |
 | Owner login | Stable | JWT + refresh tokens, account lockout, optional TOTP, canary tripwires |
 | Owner voice enrollment / verification | Beta | `/api/v1/voice/enroll` + challenge phrases; optional, never blocks password login |
 | Basic UI (chat + orb) | Stable | Next.js app, browser voice loop, resonance gate |
-| Agent activity display | Beta | agents list/detail API + routing decision returned per chat turn |
+| Agent activity display | Beta | right-rail panel + "Last run" readout (agent, model, memories used, approval) from the stream done-frame; unreported fields show "Not reported yet" |
 | Safe action approval | Stable | every destructive/outbound action (email send, calendar create/delete, note delete) is approval-gated |
 | One-command startup | Stable | `start-ira.ps1` (Windows native), `start-ira.sh` / `stop-ira.sh` (Linux/macOS/WSL) |
-| Trust Console API (`/api/v1/trust/status`) | Beta | privacy mode, model/DB locality, voice enrollment, pending approvals. UI: Planned |
+| Trust Console API (`/api/v1/trust/status`) | Beta | privacy mode, model/DB locality, voice enrollment, pending approvals |
+| Trust Console UI | Beta | renders the trust API verbatim; green safe-state only when the backend reports `local_only` |
+| Voice Setup UI | Beta | status + guided in-browser enrolment (16 kHz WAV, one-time challenge); raw audio never stored |
+| Daily dashboard | Beta | readiness from `/health` + trust probe, quick actions to all panels |
 
 ## Beta
 
@@ -50,14 +54,6 @@ Statuses below reflect what the code and test suite actually cover today — not
 - Wake-word always-on listener
 - Computer use / architect self-modification (owner-gated, protected paths)
 
-## Planned (next PR — Personal v1 UI panels)
-
-- Trust Console UI panel
-- Memory Vault UI (Use / Edit / Forget / Pin buttons)
-- Agent Activity view
-- Voice Setup screen
-- Daily-use dashboard
-
 ## Later (deliberately NOT in Personal v1)
 
 - Portable SSD mode (guard-railed `IRA_MODE=portable_demo` exists; full portable is deferred)
@@ -75,3 +71,7 @@ Statuses below reflect what the code and test suite actually cover today — not
   works, so you cannot lock yourself out via voice.
 - External APIs are disabled by default (`IRA_ALLOW_EXTERNAL_API=false`,
   `WEB_SEARCH_ENABLED=false`); enabling them is an explicit opt-in in `.env`.
+- The frontend has no unit-test framework; its gate is the strict TypeScript
+  build (`next build`). Backend behaviour the panels rely on (trust status,
+  memory-forget gating, the stream done-frame contract) is covered by the
+  Python suite.
