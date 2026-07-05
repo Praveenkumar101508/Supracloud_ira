@@ -112,6 +112,9 @@ def _app(monkeypatch):
     fake_auth.require_auth = lambda: "owner"
     fake_auth.is_owner = lambda _u=None: True
     monkeypatch.setitem(sys.modules, "api.middleware.auth", fake_auth)
+    # Force a fresh import so the fake auth binds even when another test (e.g.
+    # the app-factory suite) already imported the route with the real auth.
+    monkeypatch.delitem(sys.modules, "api.routes.mobile", raising=False)
 
     from fastapi import FastAPI
     from api.routes.mobile import router
