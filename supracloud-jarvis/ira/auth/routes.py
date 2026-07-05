@@ -81,6 +81,14 @@ def register_auth_routes(app: FastAPI, limiter) -> None:
 
         # Successful login — clear the failure counter
         await clear_failures(form.username)
+        # Record for the Trust Console (fail-soft: login never breaks on Redis)
+        try:
+            from datetime import datetime, timezone
+            from api.routes.trust import LAST_LOGIN_KEY
+            from utils.redis_client import get_redis
+            await get_redis().set(LAST_LOGIN_KEY, datetime.now(timezone.utc).isoformat())
+        except Exception:
+            pass
         return await create_login_tokens(form.username)
 
     @app.post("/auth/logout", tags=["auth"], summary="Revoke the current access token")

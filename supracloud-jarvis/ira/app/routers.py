@@ -87,3 +87,6 @@ def register_routers(app: FastAPI) -> None:
 
     from api.routes.mobile import router as mobile_router
     app.include_router(mobile_router)                            # /mobile/* (mobile app support, push OFF by default)
+
+    from api.routes.trust import router as trust_router
+    app.include_router(trust_router, prefix="/api/v1")           # Personal v1: /trust/status (privacy/locality console)
