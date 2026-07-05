@@ -535,21 +535,32 @@ cd supracloud-jarvis
 (+ TOTP if enrolled), and talk in the main chat. Each reply shows which agent and model
 handled it.
 
+**Workspace panels** — the sidebar's Workspace section switches between the Personal v1
+views (chat is never lost when you switch away):
+
+- **Dashboard** — system readiness from `/health` (Postgres, Redis, model tiers), the
+  current privacy posture, and quick actions into every other panel.
+- **Memory Vault** — list, search and filter your curated memories; save new ones with a
+  category (`profile`, `projects`, `job_search`, `goals`, ...), edit, pin/unpin. *Forget*
+  is always two-step: the backend returns a confirmation preview and only confirming that
+  exact draft deletes. Memories are reference-only data for IRA — never instructions.
+- **Trust Console** — renders `GET /api/v1/trust/status` verbatim: privacy mode,
+  external-API switch, model/DB locality, voice enrollment, pending approvals, last login
+  and live security warnings. The green shield appears only when the backend itself
+  reports `local_only`.
+- **Voice Setup** — enrolment status plus a guided in-browser enrolment: read 5 phrases
+  (the first is a one-time anti-replay challenge), clips are converted to 16 kHz WAV in
+  memory and uploaded once; only embeddings are stored.
+- **Agent activity** — lives in the right rail during chat: per-run agent cards plus a
+  "Last run" readout of what the backend actually reported (agent, model, memories used,
+  approval requirement). Anything unreported shows "Not reported yet".
+
 **Voice** — the browser voice loop is on by default (`NEXT_PUBLIC_VOICE_TRANSPORT=browser`).
 Speak after the wake word (`hey ira`) or use push-to-talk; replies are spoken via the local
-Supertonic engine. To enrol your voiceprint for owner verification:
-`GET /api/v1/voice/challenge` then `POST /api/v1/voice/enroll` with 3–10 short WAV clips —
-only the embedding is stored, raw audio is never kept. Voice is optional: password login
-always works, so you cannot lock yourself out.
-
-**Memory** — the Memory Vault at `/api/v1/memory` saves, lists, edits, pins and forgets
-your curated memories (categories are free slugs: `profile`, `projects`, `job_search`,
-`goals`, ...). Forgetting a memory always asks for confirmation first. Memories are
-reference-only data for IRA — never instructions.
-
-**Trust Console** — `GET /api/v1/trust/status` answers "is everything actually local?":
-privacy mode, external-API switch, model/DB locality, voice enrollment, pending approvals
-and live security warnings.
+Supertonic engine. Voice enrolment is easiest from the Voice Setup panel (or via
+`GET /api/v1/voice/challenge` + `POST /api/v1/voice/enroll`) — only the embedding is
+stored, raw audio is never kept. Voice is optional: password login always works, so you
+cannot lock yourself out.
 
 **Shut down**
 
