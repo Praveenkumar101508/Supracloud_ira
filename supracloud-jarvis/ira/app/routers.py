@@ -93,3 +93,6 @@ def register_routers(app: FastAPI) -> None:
 
     from api.routes.memory import router as memory_router
     app.include_router(memory_router, prefix="/api/v1")          # Personal v1: /memory vault (owner CRUD, forget gated)
+
+    from api.routes.onboarding import router as onboarding_router
+    app.include_router(onboarding_router, prefix="/api/v1")      # PR #66: /onboarding first-run setup state
