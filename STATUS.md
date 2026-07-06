@@ -39,6 +39,11 @@ Statuses below reflect what the code and test suite actually cover today — not
 | Owner Profile UI | Beta | edit name/title/wake word/voice flag; "run setup again" re-arms the wizard |
 | Wake Mode v1 | Beta | OFF by default; owner toggle in Voice Setup with always-visible mic state (off/listening/awake/processing); local-only — cannot touch privacy/external-API settings; raw audio in memory only |
 | One-click launchers | Beta | `Start IRA.bat` (Windows) / `Start IRA.command` (macOS) wrap the start scripts, open the dashboard, print "IRA is ready, boss." — Beta until exercised on real desktop hardware |
+| Relationship memory | Beta | "Rahul is my friend" → confirm-before-save → `people` table; stored as labelled reference data, injected read-only into chat; always `no_access` by default |
+| Delegated access | Beta | wizard-only grants: owner password (no DEV_MODE bypass) + confirmation token + audit log; each person gets separate credentials; voice-originated requests refused |
+| Multi-user security | Beta | delegated logins are default-denied by the scope middleware except chat / basic voice / (family_admin+) trust read; roles: viewer, trusted_user, family_admin, owner_equivalent |
+| Primary owner protection | Stable | the `.env` admin account can never be granted, revoked, demoted or duplicated — enforced in code, SQL (partial unique index + WHERE guards) and tests |
+| Access audit log | Beta | every grant/revoke/role change and denied attempt in `access_audit_log` (`GET /api/v1/access/audit`) |
 
 ## Beta
 

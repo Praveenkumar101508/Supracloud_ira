@@ -576,6 +576,15 @@ views (chat is never lost when you switch away):
   The role is fixed to Owner Admin: full access to every feature, but destructive and
   outbound actions still ask for confirmation first — that rule applies to everyone,
   including the owner.
+- **People & Relationships** (in the Memory Vault, Beta) — tell IRA who people are
+  ("Rahul is my friend", "remember Anitha is my wife"); IRA confirms before saving and
+  stores it as reference data with **no system access**. Granting access is a separate
+  security event: the wizard needs the role choice (Viewer / Trusted User / Family
+  Admin / Owner Equivalent), the person's **own** new username and password, **your
+  owner password** (never bypassed, not even in dev mode), and a final confirmation.
+  Voice can ask, but can never complete an access change. Delegated logins are
+  default-denied everywhere except chat and basic voice, nobody can remove or replace
+  the primary owner, and every access change lands in an audit log.
 - **Agent activity** — lives in the right rail during chat: per-run agent cards plus a
   "Last run" readout of what the backend actually reported (agent, model, memories used,
   approval requirement). Anything unreported shows "Not reported yet".
