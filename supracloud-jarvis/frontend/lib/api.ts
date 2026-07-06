@@ -380,6 +380,79 @@ export async function getAccessAudit(
   return res.json();
 }
 
+// ── Command Center (PR #68) ─────────────────────────────────────────────────
+
+export interface CommandPlan {
+  intent: string;
+  target: string;
+  steps: string[];
+  touches: string[];
+  risk: "low" | "medium" | "high" | "critical";
+  confirmation_required: boolean;
+  password_required: boolean;
+  blocked: boolean;
+  auto_execute: boolean;
+}
+
+export interface CommandResponse {
+  run_id: string;
+  plan: CommandPlan;
+  status:
+    | "executed"
+    | "failed"
+    | "awaiting_confirmation"
+    | "clarification"
+    | "needs_wizard"
+    | "routed_people_flow"
+    | "blocked";
+  result?: { ok?: boolean; detail?: string; [k: string]: unknown };
+  detail?: string;
+  token?: string;
+  preview?: string;
+  expires_in?: number;
+}
+
+export async function runCommand(
+  token: string,
+  text: string,
+  opts?: { confirmToken?: string; ownerPassword?: string }
+): Promise<CommandResponse> {
+  const res = await apiFetch(
+    "/api/v1/command",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        text,
+        channel: "ui",
+        confirm_token: opts?.confirmToken ?? null,
+        owner_password: opts?.ownerPassword ?? null,
+      }),
+    },
+    token
+  );
+  return res.json();
+}
+
+export interface CommandRun {
+  id: string;
+  actor: string;
+  raw_text: string;
+  intent: string;
+  plan: CommandPlan | Record<string, never>;
+  risk: string;
+  status: string;
+  result: { detail?: string; [k: string]: unknown };
+  created_at: string | null;
+  executed_at: string | null;
+}
+
+export async function getCommandHistory(
+  token: string
+): Promise<{ runs: CommandRun[]; count: number; detail?: string }> {
+  const res = await apiFetch("/api/v1/command/history", {}, token);
+  return res.json();
+}
+
 // ── Owner profile + first-run onboarding (PR #66) ───────────────────────────
 
 export interface OwnerProfile {

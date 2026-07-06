@@ -102,3 +102,6 @@ def register_routers(app: FastAPI) -> None:
 
     from api.routes.access import router as access_router
     app.include_router(access_router, prefix="/api/v1")          # PR #67: /access delegated accounts (password+confirm gated)
+
+    from api.routes.command_center import router as command_router
+    app.include_router(command_router, prefix="/api/v1")         # PR #68: /command natural commands (risk-gated)

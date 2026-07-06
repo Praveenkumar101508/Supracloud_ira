@@ -159,7 +159,7 @@ type AppMode = "assistant" | "tutor";
 // Personal v1 workspace views. Chat stays mounted underneath (its messages are
 // component-local state); the other panels overlay it so switching views never
 // loses the conversation.
-export type WorkspaceView = "chat" | "dashboard" | "memory" | "trust" | "voice" | "owner";
+export type WorkspaceView = "chat" | "dashboard" | "memory" | "trust" | "voice" | "owner" | "command";
 
 interface UIState {
   mode: AppMode;
