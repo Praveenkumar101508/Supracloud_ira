@@ -227,6 +227,159 @@ export async function enrollVoice(
   return res.json();
 }
 
+// ── People / relationships + delegated access (PR #67) ─────────────────────
+
+export interface Person {
+  id: string;
+  person_name: string;
+  relationship: string;
+  added_by: string;
+  confirmed_by_owner: boolean;
+  access_level: string;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ConfirmationDraft {
+  status: "confirmation_required";
+  action: string;
+  token: string;
+  preview: string;
+  expires_in: number;
+}
+
+export type RememberResult =
+  | ConfirmationDraft
+  | { status: "no_match" | "needs_name"; detail: string; relationship?: string }
+  | { saved: Person; detail: string };
+
+export async function rememberPerson(
+  token: string,
+  statement: string,
+  opts?: { personName?: string; confirmToken?: string }
+): Promise<RememberResult> {
+  const res = await apiFetch(
+    "/api/v1/people/remember",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        statement,
+        person_name: opts?.personName ?? null,
+        confirm_token: opts?.confirmToken ?? null,
+      }),
+    },
+    token
+  );
+  return res.json();
+}
+
+export async function listPeople(token: string): Promise<{ people: Person[]; count: number }> {
+  const res = await apiFetch("/api/v1/people", {}, token);
+  return res.json();
+}
+
+export async function updatePersonRelationship(
+  token: string,
+  personId: string,
+  relationship: string
+): Promise<Person> {
+  const res = await apiFetch(
+    `/api/v1/people/${personId}`,
+    { method: "PUT", body: JSON.stringify({ relationship }) },
+    token
+  );
+  return res.json();
+}
+
+export async function forgetPerson(
+  token: string,
+  personId: string,
+  confirmToken?: string
+): Promise<ConfirmationDraft | { deleted: string }> {
+  const qs = confirmToken ? `?confirm_token=${encodeURIComponent(confirmToken)}` : "";
+  const res = await apiFetch(`/api/v1/people/${personId}${qs}`, { method: "DELETE" }, token);
+  return res.json();
+}
+
+export interface DelegatedUser {
+  id: string;
+  username: string;
+  role: string;
+  person_id: string | null;
+  is_primary_owner: boolean;
+  active: boolean;
+  voice_enrolled: boolean;
+  created_at: string | null;
+}
+
+export async function listDelegatedUsers(
+  token: string
+): Promise<{ users: DelegatedUser[]; count: number }> {
+  const res = await apiFetch("/api/v1/access/users", {}, token);
+  return res.json();
+}
+
+export interface GrantAccessBody {
+  person_id?: string | null;
+  person_name: string;
+  role: string;
+  new_username: string;
+  new_password: string;
+  owner_password: string;
+  confirm_token?: string | null;
+}
+
+export async function grantAccess(
+  token: string,
+  body: GrantAccessBody
+): Promise<ConfirmationDraft | { granted: DelegatedUser; detail: string }> {
+  const res = await apiFetch(
+    "/api/v1/access/grant",
+    { method: "POST", body: JSON.stringify({ channel: "ui", ...body }) },
+    token
+  );
+  return res.json();
+}
+
+export async function revokeAccess(
+  token: string,
+  userId: string,
+  ownerPassword: string,
+  confirmToken?: string
+): Promise<ConfirmationDraft | { revoked: DelegatedUser }> {
+  const res = await apiFetch(
+    "/api/v1/access/revoke",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: userId,
+        owner_password: ownerPassword,
+        channel: "ui",
+        confirm_token: confirmToken ?? null,
+      }),
+    },
+    token
+  );
+  return res.json();
+}
+
+export interface AccessAuditEntry {
+  id: number;
+  actor: string;
+  action: string;
+  target: string;
+  details: Record<string, string>;
+  created_at: string | null;
+}
+
+export async function getAccessAudit(
+  token: string
+): Promise<{ entries: AccessAuditEntry[]; count: number }> {
+  const res = await apiFetch("/api/v1/access/audit", {}, token);
+  return res.json();
+}
+
 // ── Owner profile + first-run onboarding (PR #66) ───────────────────────────
 
 export interface OwnerProfile {

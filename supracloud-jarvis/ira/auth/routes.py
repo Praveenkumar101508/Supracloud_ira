@@ -52,7 +52,14 @@ def register_auth_routes(app: FastAPI, limiter) -> None:
                 content={"detail": "Account temporarily locked due to too many failed attempts. Try again later."},
             )
 
-        if not authenticate_user(form.username, form.password):
+        # Owner first; delegated accounts (PR #67) are a fallback with their own
+        # bcrypt hashes. The scope middleware default-denies their tokens on
+        # everything except the mapped chat/voice routes.
+        _authed = authenticate_user(form.username, form.password)
+        if not _authed:
+            from security.delegated import authenticate_delegated
+            _authed = await authenticate_delegated(form.username, form.password)
+        if not _authed:
             _count, _locked = await record_failure(form.username)
             if _locked:
                 return JSONResponse(
