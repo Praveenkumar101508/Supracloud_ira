@@ -227,6 +227,83 @@ export async function enrollVoice(
   return res.json();
 }
 
+// ── Owner profile + first-run onboarding (PR #66) ───────────────────────────
+
+export interface OwnerProfile {
+  name: string;
+  goals: string;
+  projects: string;
+  preferences: string;
+  preferred_title: string;
+  wake_word: string;
+  role: string;
+  first_run_completed: boolean;
+  voice_enabled: boolean;
+}
+
+export async function getOwnerProfile(token: string): Promise<OwnerProfile> {
+  const res = await apiFetch("/api/v1/profile", {}, token);
+  return res.json();
+}
+
+export async function updateOwnerProfile(
+  token: string,
+  fields: Partial<Pick<OwnerProfile, "name" | "goals" | "projects" | "preferences" | "preferred_title" | "wake_word" | "voice_enabled">>
+): Promise<OwnerProfile> {
+  const res = await apiFetch("/api/v1/profile", { method: "PUT", body: JSON.stringify(fields) }, token);
+  return res.json();
+}
+
+export interface OnboardingStatus {
+  first_run_completed: boolean;
+  owner_name: string;
+  preferred_title: string;
+  role: string;
+  wake_word: string;
+  voice_enabled: boolean;
+}
+
+export async function getOnboardingStatus(token: string): Promise<OnboardingStatus> {
+  const res = await apiFetch("/api/v1/onboarding/status", {}, token);
+  return res.json();
+}
+
+export async function completeOnboarding(
+  token: string,
+  body: { owner_name: string; preferred_title: string; wake_word: string; voice_enabled: boolean }
+): Promise<OnboardingStatus> {
+  const res = await apiFetch("/api/v1/onboarding/complete", { method: "POST", body: JSON.stringify(body) }, token);
+  return res.json();
+}
+
+export async function resetOnboarding(token: string): Promise<OnboardingStatus> {
+  const res = await apiFetch("/api/v1/onboarding/reset", { method: "POST" }, token);
+  return res.json();
+}
+
+// ── Wake Mode v1 (PR #66) ───────────────────────────────────────────────────
+
+export interface WakeStatus {
+  enabled: boolean;
+  enabled_at_boot: boolean;
+  state: "off" | "listening" | "awake" | "processing";
+  available: boolean;
+  reason: string | null;
+  model: string;
+  wake_word: string;
+  local_only: boolean;
+}
+
+export async function getWakeStatus(token: string): Promise<WakeStatus> {
+  const res = await apiFetch("/api/v1/voice/wake/status", {}, token);
+  return res.json();
+}
+
+export async function setWakeMode(token: string, enabled: boolean): Promise<WakeStatus> {
+  const res = await apiFetch("/api/v1/voice/wake", { method: "POST", body: JSON.stringify({ enabled }) }, token);
+  return res.json();
+}
+
 // ── Health detail (dashboard readiness) ─────────────────────────────────────
 
 export async function getHealthDetail(): Promise<Record<string, unknown> | null> {

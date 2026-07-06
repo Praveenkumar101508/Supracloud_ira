@@ -21,7 +21,7 @@ import {
   AlertTriangle,
   XCircle,
 } from "lucide-react";
-import { getTrustStatus, type TrustStatus } from "@/lib/api";
+import { getTrustStatus, getOwnerProfile, type TrustStatus, type OwnerProfile } from "@/lib/api";
 import { fetchHealth, type Health } from "@/lib/systemStatus";
 import { useUIStore, type WorkspaceView } from "@/lib/store";
 
@@ -47,17 +47,20 @@ export default function Dashboard({ token }: { token: string }) {
   const setView = useUIStore((s) => s.setView);
   const [health, setHealth] = useState<Health | null>(null);
   const [trust, setTrust] = useState<TrustStatus | null>(null);
+  const [profile, setProfile] = useState<OwnerProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkedAt, setCheckedAt] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [h, t] = await Promise.all([
+    const [h, t, p] = await Promise.all([
       fetchHealth(),
       getTrustStatus(token).catch(() => null),
+      getOwnerProfile(token).catch(() => null),
     ]);
     setHealth(h);
     setTrust(t);
+    setProfile(p);
     setCheckedAt(new Date());
     setLoading(false);
   }, [token]);
@@ -76,7 +79,16 @@ export default function Dashboard({ token }: { token: string }) {
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">IRA</h2>
+            <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+              {profile?.first_run_completed && (profile.preferred_title || profile.name)
+                ? `Welcome back, ${(profile.preferred_title || profile.name).toLowerCase()}.`
+                : "IRA"}
+              {profile?.role === "owner_admin" && profile.first_run_completed && (
+                <span className="text-[10px] font-medium text-cyan-300 border border-cyan-400/30 bg-cyan-400/[0.07] rounded px-1.5 py-0.5">
+                  Owner Admin
+                </span>
+              )}
+            </h2>
             <p className="text-xs text-neutral-500 mt-0.5">Your assistant. Your hardware. Your rules.</p>
           </div>
           <button
