@@ -59,3 +59,9 @@ def install_middleware(app: FastAPI, cfg) -> None:
     )
 
     app.add_middleware(_IPBlockMiddleware)
+
+    # PR #67: delegated accounts are default-denied everywhere except a small
+    # scope-mapped allowlist. The primary owner is unaffected. Added after the
+    # IP blocklist so blocking still runs first (middleware runs LIFO).
+    from security.scope_enforcer import DelegatedScopeMiddleware
+    app.add_middleware(DelegatedScopeMiddleware)

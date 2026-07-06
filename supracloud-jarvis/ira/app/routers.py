@@ -96,3 +96,9 @@ def register_routers(app: FastAPI) -> None:
 
     from api.routes.onboarding import router as onboarding_router
     app.include_router(onboarding_router, prefix="/api/v1")      # PR #66: /onboarding first-run setup state
+
+    from api.routes.people import router as people_router
+    app.include_router(people_router, prefix="/api/v1")          # PR #67: /people relationship memory (confirm-gated)
+
+    from api.routes.access import router as access_router
+    app.include_router(access_router, prefix="/api/v1")          # PR #67: /access delegated accounts (password+confirm gated)

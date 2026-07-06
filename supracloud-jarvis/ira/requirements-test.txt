@@ -38,6 +38,8 @@ opentelemetry-instrumentation-fastapi==0.48b0
 # Auth (middleware imports)
 python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1                    # MUST match requirements.txt — passlib 1.7.4's backend self-test
+                                 # breaks on bcrypt>=4.1; the delegated-access tests hash for real
 pyotp==2.9.0                     # MUST match requirements.txt — app-factory tests import api.routes.totp
 slowapi==0.1.9                   # MUST match requirements.txt — app-factory tests build the full app
 email-validator>=2.0,<3          # Required by pydantic.EmailStr (used in webhooks.py)
