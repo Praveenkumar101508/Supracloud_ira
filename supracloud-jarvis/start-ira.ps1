@@ -295,6 +295,12 @@ if ($failed) {
     Write-Host ("STACK NOT FULLY UP — failed: " + ($failed.Name -join ", ")) -ForegroundColor Red
     exit 1
 } else {
-    Write-Host "ALL UP. IRA is online. Good morning." -ForegroundColor Green
+    Write-Host "ALL UP. IRA is ready, boss." -ForegroundColor Green
+    if (-not $SkipFrontend) {
+        # Open the dashboard in the default browser (best effort, never fatal).
+        $uiUrl = "http://localhost:$([int](Get-EnvOr 'FRONTEND_PORT' '3000'))"
+        Write-Host "  UI: $uiUrl"
+        try { Start-Process $uiUrl -ErrorAction SilentlyContinue } catch {}
+    }
     exit 0
 }
