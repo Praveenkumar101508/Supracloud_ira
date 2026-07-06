@@ -585,6 +585,18 @@ views (chat is never lost when you switch away):
   Voice can ask, but can never complete an access change. Delegated logins are
   default-denied everywhere except chat and basic voice, nobody can remove or replace
   the primary owner, and every access change lands in an audit log.
+- **Command Center** (Beta) — say what you want and IRA plans it, asks only when the
+  risk requires it, then does the work and reports back. Each command becomes a visible
+  plan (intent, steps, risk level). Low-risk reversible commands ("save a memory",
+  "open memory vault", "check if my app is running") run immediately; medium-risk ones
+  ("create a project", "create a private database for project Aurora") show the exact
+  plan and run only after you approve it; high-risk ones need your owner password. Say
+  "create a private database for project Aurora" and IRA creates a local-only Postgres
+  database with its own user, writes the credentials to a `chmod 600` file under the
+  local secrets dir (never logged, never committed), and records the project in the
+  Memory Vault. Access grants, deletions, outbound actions and security changes can
+  never run from a plain command — they route to their own confirmation-gated flows,
+  and unrecognised commands get a clarifying question instead of a guessed action.
 - **Agent activity** — lives in the right rail during chat: per-run agent cards plus a
   "Last run" readout of what the backend actually reported (agent, model, memories used,
   approval requirement). Anything unreported shows "Not reported yet".

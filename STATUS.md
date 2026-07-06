@@ -44,6 +44,11 @@ Statuses below reflect what the code and test suite actually cover today — not
 | Multi-user security | Beta | delegated logins are default-denied by the scope middleware except chat / basic voice / (family_admin+) trust read; roles: viewer, trusted_user, family_admin, owner_equivalent |
 | Primary owner protection | Stable | the `.env` admin account can never be granted, revoked, demoted or duplicated — enforced in code, SQL (partial unique index + WHERE guards) and tests |
 | Access audit log | Beta | every grant/revoke/role change and denied attempt in `access_audit_log` (`GET /api/v1/access/audit`) |
+| Command Center | Beta | `POST /api/v1/command` parses natural commands into an intent + visible plan; owner-only; honest run history in `command_runs` |
+| Natural command execution | Beta | 10 intents; low-risk auto-executes, medium needs plan approval, high needs owner password, unknown asks for clarification |
+| Risk engine | Beta | low/medium/high/critical; access grants, deletes, outbound, security/role changes can never auto-execute; critical intents blocked |
+| Private DB creation | Beta | local-only Postgres DB + project user; strong password written to a chmod-600 secrets file, never logged or committed |
+| Automatic memory creation | Beta | successful commands (project/db created) save labelled reference data to the Memory Vault |
 
 ## Beta
 
