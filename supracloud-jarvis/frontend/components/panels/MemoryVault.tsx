@@ -34,6 +34,7 @@ import {
   type VaultMemory,
   type ForgetDraft,
 } from "@/lib/api";
+import PeopleSection from "@/components/panels/PeopleSection";
 
 // Suggested categories from the Personal v1 plan; the backend accepts any slug.
 const KINDS = [
@@ -394,6 +395,9 @@ export default function MemoryVault({ token }: { token: string }) {
             </div>
           );
         })}
+
+        {/* PR #67: relationship memory + delegated access live with the vault */}
+        <PeopleSection token={token} />
 
         <p className="text-[10px] text-neutral-700 px-1 pb-4">
           Memories are your data: IRA reads them as labelled reference context and never executes
