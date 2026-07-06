@@ -418,6 +418,58 @@ async def enroll_voice(
     )
 
 
+# ── Wake Mode v1 (PR #66) — visible, local-only, owner-toggled ────────────────
+
+class WakeToggleBody(BaseModel):
+    enabled: bool
+
+
+async def _wake_status_payload(request: Request) -> dict:
+    """Combine the listener's live state with the owner's configured wake word.
+
+    Wake mode is a LOCAL-ONLY input path. Toggling it never touches privacy
+    settings or external-API flags, and raw audio is processed in memory only.
+    """
+    from voice import wakeword as _wakeword
+
+    payload = _wakeword.status(request.app)
+    try:
+        import owner_profile as _profile
+        prof = await _profile.get_profile()
+        payload["wake_word"] = prof.get("wake_word") or "ira"
+    except Exception:  # profile store down → still report listener state
+        payload["wake_word"] = "ira"
+    return payload
+
+
+@router.get("/wake/status")
+async def wake_status(request: Request, _user: str = Depends(require_auth)):
+    """Visible mic status: off / listening / awake / processing + availability."""
+    return await _wake_status_payload(request)
+
+
+@router.post("/wake")
+async def wake_toggle(
+    body: WakeToggleBody,
+    request: Request,
+    _user: str = Depends(require_auth),
+):
+    """Turn Wake Mode on/off at runtime (owner's explicit choice; OFF by default).
+
+    Starting is fail-soft: if the local wake-word stack (openWakeWord/onnxruntime/
+    mic) is unavailable the status will say so instead of pretending. This toggle
+    only starts/stops the local listener — it cannot change privacy mode, enable
+    external APIs, or persist any audio.
+    """
+    from voice import wakeword as _wakeword
+
+    if body.enabled:
+        await _wakeword.start_wakeword(request.app, force=True)
+    else:
+        await _wakeword.stop_wakeword(request.app)
+    return await _wake_status_payload(request)
+
+
 @router.get("/profile/status")
 async def profile_status(_user: str = Depends(require_auth)):
     """Check whether an owner voice profile has been enrolled."""
