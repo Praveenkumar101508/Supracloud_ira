@@ -116,8 +116,16 @@ async def test_update_profile_only_known_fields_reach_db():
 
 
 def test_fields_whitelist_is_fixed():
-    """FIELDS must contain exactly the four known profile columns — no accidental expansion."""
-    assert set(FIELDS) == {"name", "goals", "projects", "preferences"}
+    """FIELDS/BOOL_FIELDS must contain exactly the known profile columns — no
+    accidental expansion. PR #66 added the onboarding/identity columns; `role`
+    is deliberately absent (read-only, never writable)."""
+    from owner_profile import BOOL_FIELDS
+
+    assert set(FIELDS) == {
+        "name", "goals", "projects", "preferences", "preferred_title", "wake_word",
+    }
+    assert set(BOOL_FIELDS) == {"first_run_completed", "voice_enabled"}
+    assert "role" not in FIELDS and "role" not in BOOL_FIELDS
 
 
 # ── tasks/manager: update_task whitelist ─────────────────────────────────────

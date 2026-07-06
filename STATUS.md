@@ -33,7 +33,12 @@ Statuses below reflect what the code and test suite actually cover today — not
 | Trust Console API (`/api/v1/trust/status`) | Beta | privacy mode, model/DB locality, voice enrollment, pending approvals |
 | Trust Console UI | Beta | renders the trust API verbatim; green safe-state only when the backend reports `local_only` |
 | Voice Setup UI | Beta | status + guided in-browser enrolment (16 kHz WAV, one-time challenge); raw audio never stored |
-| Daily dashboard | Beta | readiness from `/health` + trust probe, quick actions to all panels |
+| Daily dashboard | Beta | readiness from `/health` + trust probe, quick actions to all panels; "Welcome back" greeting from the owner profile + Owner Admin badge |
+| First-run onboarding | Beta | phone-style wizard on first login (`/api/v1/onboarding/*`); owner name / preferred title / wake word, real system + privacy checks; the flag flips only when setup completes |
+| Owner profile (identity fields) | Beta | preferred title, wake word, voice flag, fixed `owner_admin` role (never writable); preferred address injected into every chat turn |
+| Owner Profile UI | Beta | edit name/title/wake word/voice flag; "run setup again" re-arms the wizard |
+| Wake Mode v1 | Beta | OFF by default; owner toggle in Voice Setup with always-visible mic state (off/listening/awake/processing); local-only — cannot touch privacy/external-API settings; raw audio in memory only |
+| One-click launchers | Beta | `Start IRA.bat` (Windows) / `Start IRA.command` (macOS) wrap the start scripts, open the dashboard, print "IRA is ready, boss." — Beta until exercised on real desktop hardware |
 
 ## Beta
 
@@ -51,7 +56,7 @@ Statuses below reflect what the code and test suite actually cover today — not
 - Cortex engine routing (`IRA_USE_CORTEX`) — subprocess bridge via `cortex -z`
 - Android actuator (droidclaw-derived, localhost-only pairing, rate-limited)
 - Coding agent (Aider, owner-gated, branch-only)
-- Wake-word always-on listener
+- Wake-word always-on listener at boot (`IRA_WAKEWORD_ENABLED`) — the owner-facing runtime toggle is Wake Mode v1 (Beta, above)
 - Computer use / architect self-modification (owner-gated, protected paths)
 
 ## Later (deliberately NOT in Personal v1)

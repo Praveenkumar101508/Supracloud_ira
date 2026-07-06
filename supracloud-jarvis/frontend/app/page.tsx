@@ -18,6 +18,9 @@ import Dashboard from "@/components/panels/Dashboard";
 import MemoryVault from "@/components/panels/MemoryVault";
 import TrustConsole from "@/components/panels/TrustConsole";
 import VoiceSetup from "@/components/panels/VoiceSetup";
+import OwnerProfile from "@/components/panels/OwnerProfile";
+import Onboarding from "@/components/panels/Onboarding";
+import { getOnboardingStatus } from "@/lib/api";
 import { useAuthStore, useUIStore, useChatStore } from "@/lib/store";
 import { useGateStore } from "@/lib/gate/gateAuth";
 import { useExecStore, useMemoryContextStore, useVoicePanelStore } from "@/lib/nexus";
@@ -40,6 +43,25 @@ export default function Home() {
   const [chatKey, setChatKey] = useState(0);
   // Right activity rail (voice / execution / agents / memory panels)
   const [railOpen, setRailOpen] = useState(true);
+  // PR #66 first-run onboarding: null = unknown (checking), true = show wizard.
+  // Fail-open to the workspace if the status call fails — a broken backend must
+  // never lock the owner out behind a wizard that can't save.
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!token || !isAuthenticated) return;
+    let cancelled = false;
+    getOnboardingStatus(token)
+      .then((s) => {
+        if (!cancelled) setNeedsOnboarding(!s.first_run_completed);
+      })
+      .catch(() => {
+        if (!cancelled) setNeedsOnboarding(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, isAuthenticated]);
 
   useEffect(() => {
     // Fix #101: read ?mode=voice query param set by the PWA manifest shortcut
@@ -109,6 +131,12 @@ export default function Home() {
     <VoiceConsole token={token} sessionId={sessionId} />
   );
 
+  // First-run wizard: only after the gate has been passed (auth is required by
+  // the onboarding API anyway). Once complete, the workspace mounts normally.
+  if (!showGate && needsOnboarding) {
+    return <Onboarding token={token} onDone={() => setNeedsOnboarding(false)} />;
+  }
+
   return (
     <>
       {!showGate && (
@@ -153,6 +181,7 @@ export default function Home() {
               {view === "memory" && <MemoryVault token={token} />}
               {view === "trust" && <TrustConsole token={token} />}
               {view === "voice" && <VoiceSetup token={token} />}
+              {view === "owner" && <OwnerProfile token={token} />}
               {/* The LivingOrb keeps its presence after the gate — floating
                   over the workspace, still riding the live mic through the
                   shared Pulse analyser. Clicking it focuses the command

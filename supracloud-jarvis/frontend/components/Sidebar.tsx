@@ -17,6 +17,7 @@ import {
   Brain,
   ShieldCheck,
   Mic,
+  UserCog,
 } from "lucide-react";
 import clsx from "clsx";
 import { useUIStore, type WorkspaceView } from "@/lib/store";
@@ -47,6 +48,7 @@ const VIEWS: { id: WorkspaceView; label: string; icon: React.ReactNode }[] = [
   { id: "memory", label: "Memory Vault", icon: <Brain className="w-4 h-4" /> },
   { id: "trust", label: "Trust Console", icon: <ShieldCheck className="w-4 h-4" /> },
   { id: "voice", label: "Voice Setup", icon: <Mic className="w-4 h-4" /> },
+  { id: "owner", label: "Owner Profile", icon: <UserCog className="w-4 h-4" /> },
 ];
 
 const MODES: { id: AppMode; label: string; icon: React.ReactNode; accent: string; description: string }[] = [

@@ -18,13 +18,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Mic, Square, RefreshCw, ShieldCheck, Info, CheckCircle2, Circle } from "lucide-react";
+import { Mic, Square, RefreshCw, ShieldCheck, Info, CheckCircle2, Circle, Ear } from "lucide-react";
 import {
   getVoiceProfileStatus,
   getVoiceChallenge,
   enrollVoice,
   getHealthDetail,
+  getWakeStatus,
+  setWakeMode,
   type VoiceProfileStatus,
+  type WakeStatus,
 } from "@/lib/api";
 import { WavRecorder } from "@/lib/voice/wavRecorder";
 
@@ -53,6 +56,11 @@ export default function VoiceSetup({ token }: { token: string }) {
   const [error, setError] = useState("");
 
   // Enrolment flow
+  // Wake Mode v1 (PR #66)
+  const [wake, setWake] = useState<WakeStatus | null>(null);
+  const [wakeBusy, setWakeBusy] = useState(false);
+  const [wakeMsg, setWakeMsg] = useState("");
+
   const [enrolling, setEnrolling] = useState(false);
   const [challengePhrase, setChallengePhrase] = useState("");
   const challengeIdRef = useRef("");
@@ -87,12 +95,41 @@ export default function VoiceSetup({ token }: { token: string }) {
     }
   }, [token]);
 
+  const loadWake = useCallback(async () => {
+    try {
+      setWake(await getWakeStatus(token));
+    } catch {
+      setWake(null);
+    }
+  }, [token]);
+
   useEffect(() => {
     void load();
+    void loadWake();
+    // The mic state is live (listening/awake/processing) — poll it lightly.
+    const id = setInterval(() => void loadWake(), 5_000);
     return () => {
+      clearInterval(id);
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [load]);
+  }, [load, loadWake]);
+
+  const toggleWake = async () => {
+    if (!wake) return;
+    setWakeBusy(true);
+    setWakeMsg("");
+    try {
+      const next = await setWakeMode(token, !wake.enabled);
+      setWake(next);
+      if (!wake.enabled && !next.enabled) {
+        setWakeMsg(next.reason ?? "Wake Mode could not start — wake-word stack unavailable on this machine.");
+      }
+    } catch (e) {
+      setWakeMsg(e instanceof Error ? e.message : "Wake Mode toggle failed");
+    } finally {
+      setWakeBusy(false);
+    }
+  };
 
   const beginEnrolment = async () => {
     setError("");
@@ -226,6 +263,52 @@ export default function VoiceSetup({ token }: { token: string }) {
           <StatusRow label="Text-to-speech (TTS)" value={sttTts.tts} good={null} />
         </div>
 
+        {/* Wake Mode v1 — visible, local-only, OFF by default */}
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Ear className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-semibold">
+                Wake Mode{" "}
+                <span className="text-[10px] font-medium text-amber-300 border border-amber-400/30 bg-amber-400/[0.07] rounded px-1.5 py-0.5 align-middle ml-1">
+                  BETA
+                </span>
+              </h3>
+            </div>
+            <button
+              onClick={() => void toggleWake()}
+              disabled={wakeBusy || wake === null}
+              className={clsx(
+                "text-xs font-medium px-3.5 py-1.5 rounded-lg border transition-colors disabled:opacity-40",
+                wake?.enabled
+                  ? "text-emerald-300 border-emerald-400/25 bg-emerald-400/[0.1] hover:bg-emerald-400/[0.18]"
+                  : "text-neutral-300 border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+              )}
+            >
+              {wakeBusy ? "…" : wake?.enabled ? "On — turn off" : "Off — turn on"}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <MicStateChip state={wake ? (wake.enabled ? wake.state : "off") : "off"} />
+            <span className="text-[11px] text-neutral-500">
+              Wake word: <span className="text-neutral-300">“{wake?.wake_word ?? "ira"}”</span>
+              {wake && !wake.available && (
+                <span className="text-amber-300"> · wake-word stack unavailable on this machine</span>
+              )}
+            </span>
+          </div>
+
+          {wakeMsg && <p className="text-xs text-amber-300 leading-relaxed">{wakeMsg}</p>}
+
+          <p className="text-[11px] text-neutral-500 leading-relaxed">
+            Off by default. When on, the mic scans locally for the wake word only — the
+            status above is always visible, detection never leaves this machine, raw audio
+            is processed in memory and never stored, and only your enrolled voice can wake
+            IRA. Wake Mode cannot enable external APIs or change privacy settings.
+          </p>
+        </div>
+
         {/* Enrolment */}
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-3">
           <h3 className="text-sm font-semibold">Owner voice enrolment</h3>
@@ -335,6 +418,26 @@ export default function VoiceSetup({ token }: { token: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function MicStateChip({ state }: { state: "off" | "listening" | "awake" | "processing" }) {
+  const map: Record<string, { label: string; cls: string; pulse?: boolean }> = {
+    off: { label: "Mic off", cls: "text-neutral-500 border-white/10 bg-white/[0.03]" },
+    listening: {
+      label: "Listening for wake word",
+      cls: "text-cyan-300 border-cyan-400/25 bg-cyan-400/[0.07]",
+      pulse: true,
+    },
+    awake: { label: "Awake", cls: "text-emerald-300 border-emerald-400/25 bg-emerald-400/[0.07]", pulse: true },
+    processing: { label: "Processing", cls: "text-amber-300 border-amber-400/30 bg-amber-400/[0.07]", pulse: true },
+  };
+  const m = map[state] ?? map.off;
+  return (
+    <span className={clsx("inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-md border", m.cls)}>
+      <span className={clsx("w-1.5 h-1.5 rounded-full bg-current", m.pulse && "animate-pulse")} />
+      {m.label}
+    </span>
   );
 }
 

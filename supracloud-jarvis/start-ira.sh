@@ -182,8 +182,15 @@ if [[ -n "$FAILED" ]]; then
     echo -e "${RED}STACK NOT FULLY UP — failed:${FAILED}${NC}"
     exit 1
 else
-    echo -e "${GREEN}ALL UP. IRA is online. Good morning.${NC}"
-    echo -e "  UI:  ${CYAN}http://localhost:$(env_or FRONTEND_PORT 3000)${NC}"
+    UI_URL="http://localhost:$(env_or FRONTEND_PORT 3000)"
+    echo -e "${GREEN}ALL UP. IRA is ready, boss.${NC}"
+    echo -e "  UI:  ${CYAN}$UI_URL${NC}"
     echo -e "  API: ${CYAN}http://127.0.0.1:$(env_or IRA_API_PORT 8000)/docs${NC}"
     echo -e "  Stop with: ${CYAN}./stop-ira.sh${NC}"
+    # Open the dashboard in the default browser (best effort, never fatal).
+    if ! $SKIP_FRONTEND; then
+        if command -v xdg-open >/dev/null 2>&1; then xdg-open "$UI_URL" >/dev/null 2>&1 || true
+        elif command -v open >/dev/null 2>&1; then open "$UI_URL" >/dev/null 2>&1 || true
+        fi
+    fi
 fi

@@ -174,6 +174,11 @@ class WakeWordListener:
         self.verify_frames = verify_frames
         self.command_frames = command_frames
         self.running = False
+        # Visible mic status for the UI: off / listening / awake / processing.
+        # "listening" = scanning for the wake word only; "awake" = wake word heard,
+        # verifying the owner; "processing" = capturing + transcribing the command.
+        # Raw audio only ever lives in memory — nothing here is written to disk.
+        self.state = "off"
         # -inf (not 0.0): time.monotonic()'s reference point is arbitrary, so a
         # freshly-booted box could have monotonic() < cooldown and wrongly suppress
         # the very first activation. -inf guarantees the first wake always fires.
@@ -181,9 +186,11 @@ class WakeWordListener:
 
     def stop(self) -> None:
         self.running = False
+        self.state = "off"
 
     async def run(self) -> None:
         self.running = True
+        self.state = "listening"
         loop = asyncio.get_running_loop()
         logger.info("Wake-word listener online (threshold=%.2f).", self.threshold)
         try:
@@ -197,6 +204,7 @@ class WakeWordListener:
         except Exception as exc:  # noqa: BLE001 - never let the loop crash IRA
             logger.warning("Wake-word listener stopped on error: %s", exc)
         finally:
+            self.state = "off"
             with contextlib.suppress(Exception):
                 self._source.close()
 
@@ -211,18 +219,25 @@ class WakeWordListener:
 
     async def _on_wake(self, loop) -> None:
         # a) owner gate — capture a short window and verify it's the owner's voice
-        verify_pcm = await self._read_window(loop, self.verify_frames)
-        is_owner = await self._gate(verify_pcm, session_id="wakeword")
-        if not is_owner:
-            logger.info("Wake word fired but speaker is not the owner — ignoring.")
-            self._last_fire = time.monotonic()
-            return
+        self.state = "awake"
+        try:
+            verify_pcm = await self._read_window(loop, self.verify_frames)
+            is_owner = await self._gate(verify_pcm, session_id="wakeword")
+            if not is_owner:
+                logger.info("Wake word fired but speaker is not the owner — ignoring.")
+                self._last_fire = time.monotonic()
+                return
 
-        # b) capture the command and transcribe it locally
-        command_pcm = await self._read_window(loop, self.command_frames)
-        wav = _pcm16_to_wav(command_pcm)
-        text = (await loop.run_in_executor(None, self._transcribe, wav)).strip()
-        self._last_fire = time.monotonic()
+            # b) capture the command and transcribe it locally (in memory only)
+            self.state = "processing"
+            command_pcm = await self._read_window(loop, self.command_frames)
+            wav = _pcm16_to_wav(command_pcm)
+            text = (await loop.run_in_executor(None, self._transcribe, wav)).strip()
+            self._last_fire = time.monotonic()
+        finally:
+            # Back to scanning for the wake word (unless stop() already fired).
+            if self.running:
+                self.state = "listening"
         if not text:
             return
 
@@ -235,12 +250,36 @@ class WakeWordListener:
         await feed_percept(self.app, "voice", text)
 
 
-# ── Lifecycle (called from main.lifespan) ────────────────────────────────────
+# ── Lifecycle (called from main.lifespan and the /voice/wake API toggle) ─────
 
-async def start_wakeword(app) -> None:
-    """Start the wake-word listener as a background task. No-op unless enabled;
-    fail-soft so it can never block or crash API startup."""
-    if not enabled():
+def status(app) -> dict:
+    """Visible mic status for the UI. Never touches audio hardware.
+
+    state: "off" | "listening" | "awake" | "processing". Wake mode is a
+    LOCAL-ONLY input path: it can never enable external APIs or change privacy
+    settings, and raw audio is processed in memory only (never persisted).
+    """
+    listener = getattr(app.state, "wakeword", None)
+    running = listener is not None and getattr(listener, "running", False)
+    available, reason = is_available()
+    return {
+        "enabled": running,
+        "enabled_at_boot": enabled(),
+        "state": getattr(listener, "state", "off") if listener else "off",
+        "available": available,
+        "reason": None if available else reason,
+        "model": os.getenv("IRA_WAKEWORD_MODEL", "hey_jarvis").strip(),
+        "local_only": True,
+    }
+
+
+async def start_wakeword(app, *, force: bool = False) -> None:
+    """Start the wake-word listener as a background task. No-op unless enabled
+    (or `force=True` from the owner's explicit UI toggle); fail-soft so it can
+    never block or crash API startup."""
+    if getattr(app.state, "wakeword", None) is not None:
+        return  # already running
+    if not enabled() and not force:
         logger.info("Wake word disabled (set IRA_WAKEWORD_ENABLED=true to enable)")
         return
     try:
@@ -285,7 +324,7 @@ async def stop_wakeword(app) -> None:
 
 
 __all__ = [
-    "enabled", "is_available", "start_wakeword", "stop_wakeword",
+    "enabled", "is_available", "status", "start_wakeword", "stop_wakeword",
     "WakeWordListener", "WakeWordDetector", "MicAudioSource",
     "SAMPLE_RATE", "FRAME_SAMPLES",
 ]

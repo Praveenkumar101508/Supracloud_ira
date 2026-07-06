@@ -527,9 +527,25 @@ any public release. Feature-by-feature honesty lives in [`STATUS.md`](STATUS.md)
 ```bash
 cd supracloud-jarvis
 ./start-ira.sh            # Linux/macOS/WSL — checks Python/Node/Ollama/Postgres/Redis/.env,
-                          # then starts the API and UI and prints ALL UP
+                          # then starts the API and UI, opens the dashboard,
+                          # and prints "ALL UP. IRA is ready, boss."
 ./start-ira.ps1           # Windows native (same checks, same order)
 ```
+
+One-click launchers (Beta) wrap the same scripts for double-click daily use:
+**`Start IRA.bat`** on Windows and **`Start IRA.command`** on macOS (both in
+`supracloud-jarvis/`). They run the full dependency checks, start the backend and
+frontend, open the dashboard in your browser, and keep the window open so you can
+read the summary. No secrets live in the launchers — configuration stays in `.env`.
+
+**First run** — the first successful login opens a one-time setup wizard: create your
+owner profile (you are the Owner Admin), choose how IRA should address you
+(*Sir / Boss / your name / custom*), confirm local-only privacy, run a live system
+check (backend, Ollama, Postgres, Redis), and optionally set up voice and the wake
+word (default `ira`). Setup is marked complete only at the final step — if you close
+it midway, it reruns next time. Afterwards the dashboard greets you with
+*“Welcome back, boss.”* (or whatever title you picked). Rerun it any time from
+Owner Profile → *Run setup again*, or `POST /api/v1/onboarding/reset`.
 
 **Chat** — open `http://localhost:3000`, log in with your admin username + password
 (+ TOTP if enrolled), and talk in the main chat. Each reply shows which agent and model
@@ -550,7 +566,16 @@ views (chat is never lost when you switch away):
   reports `local_only`.
 - **Voice Setup** — enrolment status plus a guided in-browser enrolment: read 5 phrases
   (the first is a one-time anti-replay challenge), clips are converted to 16 kHz WAV in
-  memory and uploaded once; only embeddings are stored.
+  memory and uploaded once; only embeddings are stored. Also hosts **Wake Mode v1**
+  (Beta): an on/off toggle with an always-visible mic state
+  (*off / listening / awake / processing*). Wake Mode is OFF by default, detection is
+  local-only, only the enrolled owner's voice can wake IRA, raw audio never touches
+  disk, and the toggle cannot change privacy or external-API settings.
+- **Owner Profile** — your name, preferred address ("boss", "sir", your name, or
+  custom — IRA uses it naturally, not in every sentence), wake word, and voice flag.
+  The role is fixed to Owner Admin: full access to every feature, but destructive and
+  outbound actions still ask for confirmation first — that rule applies to everyone,
+  including the owner.
 - **Agent activity** — lives in the right rail during chat: per-run agent cards plus a
   "Last run" readout of what the backend actually reported (agent, model, memories used,
   approval requirement). Anything unreported shows "Not reported yet".
