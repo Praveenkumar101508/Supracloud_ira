@@ -211,6 +211,10 @@ class Settings(BaseSettings):
     # ── Notes (local-first, on-disk markdown) ─────────────────────────────────
     notes_dir: str = "data/notes"
 
+    # ── Command Center (PR #68): project workspaces + local-only secrets ─────
+    projects_dir: str = "data/projects"          # per-project folders + notes
+    secrets_dir: str = "data/secrets"            # chmod-600 .env files, NEVER committed
+
     # ── Calendar: Cal.com ─────────────────────────────────────────────────────
     calcom_api_key: str = ""
     calcom_api_url: str = "https://api.cal.com"
