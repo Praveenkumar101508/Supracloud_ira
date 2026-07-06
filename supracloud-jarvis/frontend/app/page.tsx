@@ -19,6 +19,7 @@ import MemoryVault from "@/components/panels/MemoryVault";
 import TrustConsole from "@/components/panels/TrustConsole";
 import VoiceSetup from "@/components/panels/VoiceSetup";
 import OwnerProfile from "@/components/panels/OwnerProfile";
+import CommandCenter from "@/components/panels/CommandCenter";
 import Onboarding from "@/components/panels/Onboarding";
 import { getOnboardingStatus } from "@/lib/api";
 import { useAuthStore, useUIStore, useChatStore } from "@/lib/store";
@@ -182,6 +183,7 @@ export default function Home() {
               {view === "trust" && <TrustConsole token={token} />}
               {view === "voice" && <VoiceSetup token={token} />}
               {view === "owner" && <OwnerProfile token={token} />}
+              {view === "command" && <CommandCenter token={token} />}
               {/* The LivingOrb keeps its presence after the gate — floating
                   over the workspace, still riding the live mic through the
                   shared Pulse analyser. Clicking it focuses the command
