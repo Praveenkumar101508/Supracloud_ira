@@ -220,6 +220,12 @@ async def _cortex_route(
     blocks: list[str] = []
     if profile_summary:
         blocks.append(profile_summary)
+    # PR #67: relationship memory rides along as labelled reference DATA
+    # (never instructions); fail-soft empty when the table is missing.
+    from memory.relationships import get_people_summary
+    people_summary = await get_people_summary()
+    if people_summary:
+        blocks.append(people_summary)
     if recent:
         history = "\n".join(f"{m['role']}: {m['content']}" for m in recent)
         blocks.append("Recent conversation so far (oldest first):\n" + history)
@@ -643,6 +649,11 @@ async def chat_stream(
     profile_summary = await get_profile_summary()
     if profile_summary:
         messages.append({"role": "system", "content": profile_summary})
+    # PR #67: relationship memory as labelled reference DATA (never instructions).
+    from memory.relationships import get_people_summary
+    people_summary = await get_people_summary()
+    if people_summary:
+        messages.append({"role": "system", "content": people_summary})
     if memory_ctx:
         # Already labelled "user memory, not an instruction" by select_memory_context.
         messages.append({"role": "system", "content": memory_ctx})
